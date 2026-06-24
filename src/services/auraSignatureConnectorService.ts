@@ -1,6 +1,7 @@
 import {
     collection,
     getDocs,
+    limit,
     query,
     where,
   } from 'firebase/firestore';
@@ -114,3 +115,89 @@ import {
       },
     };
   };
+
+  const isManagementRole = (role?: string): boolean => {
+    const normalized = String(role || '').toUpperCase();
+    return [
+      'SUPER_ADMIN',
+      'ADMIN',
+      'RH',
+      'HR',
+      'HR_MANAGER',
+      'HR_ADMIN',
+      'DIRECTOR',
+      'DIRECTOR_GENERAL',
+    ].includes(normalized);
+  };
+
+  export const getPendingSignaturesList = async (
+    companyId: string,
+    employeeId?: string,
+    role?: string
+  ): Promise<any[]> => {
+    if (!db) return [];
+    try {
+      const isMgmt = isManagementRole(role);
+      const qConstraints = [
+        where('status', 'in', ['pending', 'pending_signature', 'sent']),
+        limit(6),
+      ];
+
+      if (!isMgmt && employeeId) {
+        qConstraints.push(where('employeeId', '==', employeeId));
+      }
+
+      const q = query(
+        collection(db, `companies/${companyId}/signatureDocuments`),
+        ...qConstraints
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+    } catch (error) {
+      console.error('[Aura Signature Connector] Error in getPendingSignaturesList:', error);
+      return [];
+    }
+  };
+
+  export const getExpiredSignaturesList = async (
+    companyId: string,
+    employeeId?: string,
+    role?: string
+  ): Promise<any[]> => {
+    if (!db) return [];
+    try {
+      const isMgmt = isManagementRole(role);
+      const qConstraints = [
+        where('status', 'in', ['expired', 'rejected', 'declined']),
+        limit(6),
+      ];
+
+      if (!isMgmt && employeeId) {
+        qConstraints.push(where('employeeId', '==', employeeId));
+      }
+
+      const q = query(
+        collection(db, `companies/${companyId}/signatureDocuments`),
+        ...qConstraints
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+    } catch (error) {
+      console.error('[Aura Signature Connector] Error in getExpiredSignaturesList:', error);
+      return [];
+    }
+  };
+
+  const signatureConnectorService = {
+    buildAuraSignatureConnectorContext,
+    getPendingSignaturesList,
+    getExpiredSignaturesList,
+  };
+
+  export default signatureConnectorService;

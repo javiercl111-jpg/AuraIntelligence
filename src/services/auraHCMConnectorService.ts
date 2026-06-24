@@ -220,3 +220,219 @@ import {
       company,
     };
   };
+
+  const isManagementRole = (role?: string): boolean => {
+    const normalized = String(role || '').toUpperCase();
+    return [
+      'SUPER_ADMIN',
+      'ADMIN',
+      'RH',
+      'HR',
+      'HR_MANAGER',
+      'HR_ADMIN',
+      'DIRECTOR',
+      'DIRECTOR_GENERAL',
+    ].includes(normalized);
+  };
+
+  export const getPendingVacationRequests = async (
+    companyId: string,
+    employeeId?: string,
+    role?: string
+  ): Promise<any[]> => {
+    if (!db) return [];
+    try {
+      const isMgmt = isManagementRole(role);
+      const qConstraints = [
+        where('companyId', '==', companyId),
+        where('status', 'in', ['PENDING', 'PENDING_DIRECTOR', 'PENDING_RH']),
+        limit(6),
+      ];
+
+      if (!isMgmt && employeeId) {
+        qConstraints.push(where('employeeId', '==', employeeId));
+      }
+
+      const q = query(collection(db, 'vacation_requests'), ...qConstraints);
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+    } catch (error) {
+      console.error('[Aura HCM Connector] Error in getPendingVacationRequests:', error);
+      return [];
+    }
+  };
+
+  export const getPendingPermissionRequests = async (
+    companyId: string,
+    employeeId?: string,
+    role?: string
+  ): Promise<any[]> => {
+    if (!db) return [];
+    try {
+      const isMgmt = isManagementRole(role);
+      const qConstraints = [
+        where('companyId', '==', companyId),
+        where('status', 'in', ['PENDING', 'PENDING_RH']),
+        limit(6),
+      ];
+
+      if (!isMgmt && employeeId) {
+        qConstraints.push(where('employeeId', '==', employeeId));
+      }
+
+      const q = query(collection(db, 'permission_requests'), ...qConstraints);
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+    } catch (error) {
+      console.error('[Aura HCM Connector] Error in getPendingPermissionRequests:', error);
+      return [];
+    }
+  };
+
+  export const getActiveIncapacities = async (
+    companyId: string,
+    employeeId?: string,
+    role?: string
+  ): Promise<any[]> => {
+    if (!db) return [];
+    try {
+      const isMgmt = isManagementRole(role);
+      const qConstraints = [
+        where('companyId', '==', companyId),
+        where('recordStatus', '==', 'ACTIVE'),
+        limit(6),
+      ];
+
+      if (!isMgmt && employeeId) {
+        qConstraints.push(where('employeeId', '==', employeeId));
+      }
+
+      const q = query(collection(db, 'incapacity_requests'), ...qConstraints);
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+    } catch (error) {
+      console.error('[Aura HCM Connector] Error in getActiveIncapacities:', error);
+      return [];
+    }
+  };
+
+  export const getExpiringDocuments = async (
+    companyId: string,
+    employeeId?: string
+  ): Promise<any[]> => {
+    if (!db) return [];
+    try {
+      const qConstraints = [
+        where('companyId', '==', companyId),
+        where('isOperationalAlertActive', '==', true),
+        limit(6),
+      ];
+
+      if (employeeId) {
+        qConstraints.push(where('employeeId', '==', employeeId));
+      }
+
+      const q = query(collection(db, 'document_expiry_alerts_log'), ...qConstraints);
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+    } catch (error) {
+      console.error('[Aura HCM Connector] Error in getExpiringDocuments:', error);
+      return [];
+    }
+  };
+
+  export const getPendingAlerts = async (
+    companyId: string,
+    employeeId?: string,
+    role?: string
+  ): Promise<any[]> => {
+    if (!db) return [];
+    try {
+      const isMgmt = isManagementRole(role);
+      const limitVal = 6;
+
+      const safeQuery = async (colName: string, path?: string) => {
+        try {
+          const qConstraints = [
+            where('isOperationalAlertActive', '==', true),
+            limit(limitVal),
+          ];
+
+          if (!path) {
+            qConstraints.push(where('companyId', '==', companyId));
+          }
+
+          if (!isMgmt && employeeId) {
+            qConstraints.push(where('employeeId', '==', employeeId));
+          }
+
+          const colRef = path ? collection(db, path) : collection(db, colName);
+          const q = query(colRef, ...qConstraints);
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map((doc) => ({
+            id: doc.id,
+            alertSource: colName
+              .toUpperCase()
+              .replace('_REQUESTS', '')
+              .replace('_ALERTS_LOG', '')
+              .replace('_ALERTS', ''),
+            ...doc.data(),
+          }));
+        } catch (err) {
+          console.warn(`[Aura HCM Connector] Failed safeQuery for ${colName}:`, err);
+          return [];
+        }
+      };
+
+      const [
+        attendance,
+        documents,
+        vacations,
+        permissions,
+        incapacities,
+        signatures,
+      ] = await Promise.all([
+        safeQuery('attendance_alerts'),
+        safeQuery('document_expiry_alerts_log'),
+        safeQuery('vacation_requests'),
+        safeQuery('permission_requests'),
+        safeQuery('incapacity_requests'),
+        safeQuery('signatureDocuments', `companies/${companyId}/signatureDocuments`),
+      ]);
+
+      return [
+        ...attendance,
+        ...documents,
+        ...vacations,
+        ...permissions,
+        ...incapacities,
+        ...signatures,
+      ];
+    } catch (error) {
+      console.error('[Aura HCM Connector] Error in getPendingAlerts:', error);
+      return [];
+    }
+  };
+
+  const hcmConnectorService = {
+    buildAuraHCMConnectorContext,
+    getPendingVacationRequests,
+    getPendingPermissionRequests,
+    getActiveIncapacities,
+    getExpiringDocuments,
+    getPendingAlerts,
+  };
+
+  export default hcmConnectorService;

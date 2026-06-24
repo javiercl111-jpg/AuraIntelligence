@@ -20,6 +20,7 @@ import { answerAuraMaintenanceQuestion } from './auraMaintenanceIntelligence';
 import { buildAuraSignatureConnectorContext } from './auraSignatureConnectorService';
 import { answerAuraSignatureQuestion } from './auraSignatureIntelligence';
 import { resolveAuraPreparedAction } from './auraPreparedActionResolver';
+import answerAuraOperationalQuestion from '../modules/operational-intelligence/services/auraOperationalIntelligenceService';
 
 import type {
   AuraAskRequest,
@@ -148,7 +149,14 @@ export const askAuraIntelligence = async (
         })
       : null;
 
-    const connectorAnswer = maintenanceAnswer || signatureAnswer;
+    const operationalAnswer = await answerAuraOperationalQuestion({
+      question: request.question,
+      companyId: resolvedContext.companyId,
+      employeeId: hcmContext.employee?.employeeId,
+      role: resolvedContext.role,
+    });
+
+    const connectorAnswer = operationalAnswer || maintenanceAnswer || signatureAnswer;
 
     const articles = connectorAnswer
       ? []
