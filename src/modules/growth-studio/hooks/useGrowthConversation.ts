@@ -6,15 +6,18 @@ import { useState, useCallback } from 'react';
 import type { GrowthConversation, GrowthConversationTurn } from '../types/growthConversation';
 import type { GrowthObjective } from '../types/growthObjective';
 import type { BrandBrain } from '../types/brandBrain';
+import type { CampaignStrategy } from '../types/campaignStrategy';
 import { growthConversationService } from '../services/growthConversationMockService';
 import { growthObjectiveService } from '../services/growthObjectiveMockService';
 import { brandBrainMockService } from '../services/brandBrainMockService';
+import { campaignStrategyMockService } from '../services/campaignStrategyMockService';
 
 export const useGrowthConversation = () => {
   const [conversation, setConversation] = useState<GrowthConversation | null>(null);
   const [turns, setTurns] = useState<GrowthConversationTurn[]>([]);
   const [objective, setObjective] = useState<GrowthObjective | null>(null);
   const [brandBrain, setBrandBrain] = useState<BrandBrain | null>(null);
+  const [campaignStrategy, setCampaignStrategy] = useState<CampaignStrategy | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -98,6 +101,16 @@ export const useGrowthConversation = () => {
             explicitConfirmations
           );
           setBrandBrain(bb);
+
+          // Build Campaign Strategy
+          const strategy = await campaignStrategyMockService.buildStrategy(
+            updatedConv.tenantId,
+            updatedConv.companyId,
+            obj.id,
+            bb.id,
+            updatedConv.id
+          );
+          setCampaignStrategy(strategy);
         }
       }
       
@@ -113,6 +126,7 @@ export const useGrowthConversation = () => {
     turns,
     objective,
     brandBrain,
+    campaignStrategy,
     isTyping,
     error,
     start,

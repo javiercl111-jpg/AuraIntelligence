@@ -10,13 +10,14 @@ import ExecutiveReflectionCard from './ExecutiveReflectionCard';
 import ExecutiveProposalCard from './ExecutiveProposalCard';
 import GrowthObjectiveSummary from './GrowthObjectiveSummary';
 import BrandBrainSummary from './BrandBrainSummary';
+import CampaignStrategySummary from './CampaignStrategySummary';
 
 interface ExecutiveConversationPageProps {
   onClose: () => void;
 }
 
 export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps> = ({ onClose }) => {
-  const { conversation, turns, objective, brandBrain, isTyping, error, start, addTurn } = useGrowthConversation();
+  const { conversation, turns, objective, brandBrain, campaignStrategy, isTyping, error, start, addTurn } = useGrowthConversation();
   const [inputValue, setInputValue] = useState('');
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
@@ -90,6 +91,7 @@ export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps>
                 <div className="mb-4 flex flex-col gap-6">
                   {objective && <GrowthObjectiveSummary objective={objective} />}
                   {brandBrain && <BrandBrainSummary brain={brandBrain} />}
+                  {campaignStrategy && <CampaignStrategySummary strategy={campaignStrategy} />}
                   <ExecutiveReflectionCard context={conversation.structuredContext} />
                 </div>
               )}

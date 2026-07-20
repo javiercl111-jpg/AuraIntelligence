@@ -79,9 +79,9 @@ describe('ExecutiveConversationPage', () => {
     });
 
     // Verificar que NO se renderizan los resúmenes en etapas iniciales
-    expect(screen.queryByText(/Growth Objective/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Memoria de Identidad/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Nivel de conocimiento de marca/i)).not.toBeInTheDocument();
+    expect(screen.queryAllByText(/Growth Objective/i)).toHaveLength(0);
+    expect(screen.queryAllByText(/Memoria de Identidad/i)).toHaveLength(0);
+    expect(screen.queryAllByText(/Nivel de conocimiento de marca/i)).toHaveLength(0);
 
     const input = screen.getByPlaceholderText('Escribe tu respuesta...');
     const submitBtn = screen.getByRole('button', { name: /enviar/i });
@@ -114,7 +114,7 @@ describe('ExecutiveConversationPage', () => {
     // Esperar a llegar a la fase executive_reflection
     await waitFor(() => {
       // Debería renderizarse el Resumen del Objetivo
-      expect(screen.getByText(/Growth Objective/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/Growth Objective/i).length).toBeGreaterThan(0);
     });
 
     await waitFor(() => {
@@ -148,8 +148,8 @@ describe('ExecutiveConversationPage', () => {
       // Debería aparecer la propuesta preliminar
       expect(screen.getByText(/Propuesta preliminar de demostración/i)).toBeInTheDocument();
       // Los resúmenes no deberían seguir mostrándose en esta etapa si la UI los oculta
-      expect(screen.queryByText(/Growth Objective/i)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Memoria de Identidad/i)).not.toBeInTheDocument();
+      expect(screen.queryAllByText(/Growth Objective/i)).toHaveLength(0);
+      expect(screen.queryAllByText(/Memoria de Identidad/i)).toHaveLength(0);
     });
   });
 });

@@ -62,4 +62,14 @@ export type {
   AnalyticsTimeRange,
 } from './growthAnalytics';
 
+// Campaign Strategy
+export type {
+  CampaignStrategyFieldStatus,
+  CampaignStrategyField,
+  Assumption,
+  StrategyRisk,
+  ExecutionConstraints,
+  CampaignStrategy,
+} from './campaignStrategy';
+
 export default {};
