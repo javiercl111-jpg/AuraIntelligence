@@ -9,6 +9,10 @@ export { default as GrowthObjectiveSummary } from './components/GrowthObjectiveS
 export { default as GrowthObjectiveCard } from './components/GrowthObjectiveCard';
 export { default as CompletionIndicator } from './components/CompletionIndicator';
 export { default as MissingInformationBadge } from './components/MissingInformationBadge';
+export { default as BrandBrainSummary } from './components/BrandBrainSummary';
+export { default as BrandBrainCard } from './components/BrandBrainCard';
+export { default as KnowledgeGapCard } from './components/KnowledgeGapCard';
+export { default as ConfidenceIndicator } from './components/ConfidenceIndicator';
 export * from './types/growthConversation';
 export * from './types/growthObjective';
 
@@ -42,15 +46,13 @@ export type {
   PublicationChannel,
   CampaignContentPiece,
   CampaignSchedule,
-  BrandBrainProfile,
-  BrandIdentity,
-  BrandTone,
-  BrandLanguageGuidelines,
-  BrandAudience,
-  BrandProductOrService,
-  BrandVisualIdentityRef,
-  BrandDataProvenance,
-  BrandDataConfidence,
+  BrandBrainFieldStatus,
+  BrandBrainConfidence,
+  BrandBrainField,
+  KnownFact,
+  KnowledgeGap,
+  CompanyProfile,
+  BrandBrain,
   GrowthApproval,
   GrowthApprovalStatus,
   ApprovableEntityType,

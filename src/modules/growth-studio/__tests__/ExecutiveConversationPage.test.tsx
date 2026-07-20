@@ -68,4 +68,88 @@ describe('ExecutiveConversationPage', () => {
     // The button itself is disabled if string is empty
     expect(submitBtn).toBeDisabled();
   });
+
+  it('progresa por el flujo completo y verifica los resúmenes de Objective y Brand Brain en la UI', async () => {
+    setMockResponseDelay(0);
+    render(<ExecutiveConversationPage onClose={() => {}} />);
+
+    // 1. Iniciar en welcome / waiting for objective
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('Escribe tu respuesta...')).toBeInTheDocument();
+    });
+
+    // Verificar que NO se renderizan los resúmenes en etapas iniciales
+    expect(screen.queryByText(/Growth Objective/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Memoria de Identidad/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Nivel de conocimiento de marca/i)).not.toBeInTheDocument();
+
+    const input = screen.getByPlaceholderText('Escribe tu respuesta...');
+    const submitBtn = screen.getByRole('button', { name: /enviar/i });
+
+    // Enviar Objetivo (Quiero vender Aura HCM)
+    fireEvent.change(input, { target: { value: 'Quiero vender Aura HCM' } });
+    fireEvent.click(submitBtn);
+
+    // Enviar Audiencia (Hoteles)
+    await waitFor(() => {
+      expect(input).not.toBeDisabled();
+    });
+    fireEvent.change(input, { target: { value: 'Hoteles' } });
+    fireEvent.click(submitBtn);
+
+    // Enviar Región (México)
+    await waitFor(() => {
+      expect(input).not.toBeDisabled();
+    });
+    fireEvent.change(input, { target: { value: 'México' } });
+    fireEvent.click(submitBtn);
+
+    // Enviar Resultado esperado (Incrementar ventas 20%)
+    await waitFor(() => {
+      expect(input).not.toBeDisabled();
+    });
+    fireEvent.change(input, { target: { value: 'Incrementar ventas 20%' } });
+    fireEvent.click(submitBtn);
+
+    // Esperar a llegar a la fase executive_reflection
+    await waitFor(() => {
+      // Debería renderizarse el Resumen del Objetivo
+      expect(screen.getByText(/Growth Objective/i)).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      // Debería renderizarse el Brand Brain Summary
+      expect(screen.getByText(/Memoria de Identidad/i)).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      // Debería renderizarse el ConfidenceIndicator
+      expect(screen.getByText(/Nivel de conocimiento de marca/i)).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      // Debería renderizarse el KnowledgeGapCard con vacíos (por ejemplo, diferenciadores o propuesta de valor que están en missing)
+      expect(screen.getByText(/Vacíos de Conocimiento/i)).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Diferenciadores/i).length).toBeGreaterThan(0);
+    });
+
+    // Confirmación: Enviar "sí, es correcto"
+    await waitFor(() => {
+      expect(input).not.toBeDisabled();
+    });
+    fireEvent.change(input, { target: { value: 'sí, es correcto' } });
+    fireEvent.click(submitBtn);
+
+    // Llegamos a la propuesta
+    await waitFor(() => {
+      // Debería aparecer la propuesta preliminar
+      expect(screen.getByText(/Propuesta preliminar de demostración/i)).toBeInTheDocument();
+      // Los resúmenes no deberían seguir mostrándose en esta etapa si la UI los oculta
+      expect(screen.queryByText(/Growth Objective/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Memoria de Identidad/i)).not.toBeInTheDocument();
+    });
+  });
 });

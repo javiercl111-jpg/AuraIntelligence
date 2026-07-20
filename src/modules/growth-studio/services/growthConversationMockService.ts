@@ -222,7 +222,7 @@ export class GrowthConversationMockService implements IGrowthConversationService
             nextStage = 'executive_proposal';
           }
         } else {
-          // Correction logic
+          // Correction logic for both Objective and Brand Brain
           if (userMsg.includes('objetivo') || userMsg.includes('meta')) {
             conv.structuredContext.objective = lastUserTurn?.content; // simplistic mock capture
             content = 'He actualizado el objetivo. ¿La información actual es correcta o deseas corregir algo más?';
@@ -235,10 +235,19 @@ export class GrowthConversationMockService implements IGrowthConversationService
           } else if (userMsg.includes('resultado')) {
             conv.structuredContext.expectedResult = lastUserTurn?.content;
             content = 'He actualizado el resultado esperado. ¿La información actual es correcta o deseas corregir algo más?';
+          } else if (userMsg.includes('industria')) {
+            conv.structuredContext.additionalData = { ...conv.structuredContext.additionalData, industry: lastUserTurn?.content };
+            content = 'He actualizado la industria del Brand Brain. ¿Deseas corregir algo más o todo es correcto?';
+          } else if (userMsg.includes('propuesta de valor') || userMsg.includes('valor')) {
+            conv.structuredContext.additionalData = { ...conv.structuredContext.additionalData, valueProposition: lastUserTurn?.content };
+            content = 'He actualizado la propuesta de valor del Brand Brain. ¿Deseas corregir algo más?';
+          } else if (userMsg.includes('diferenciador')) {
+            const diffs = conv.structuredContext.additionalData?.differentiators as string[] || [];
+            conv.structuredContext.additionalData = { ...conv.structuredContext.additionalData, differentiators: [...diffs, lastUserTurn?.content] };
+            content = 'He actualizado los diferenciadores del Brand Brain. ¿Algo más?';
           } else {
-            content = 'De acuerdo, indícame qué campo deseas corregir mencionando su nombre (ej. "Mi nuevo objetivo es...", "La audiencia será...").';
+            content = '¿Qué campo específico deseas corregir? (ej. objetivo, audiencia, industria, propuesta de valor)';
           }
-          // Stay in executive_reflection to allow more corrections or confirmation
         }
         break;
       }

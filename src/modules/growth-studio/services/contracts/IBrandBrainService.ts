@@ -2,38 +2,7 @@
 // Aura Growth Studio™ — IBrandBrainService Contract
 // ─────────────────────────────────────────────────────────────
 
-import type { BrandBrainProfile } from '../../types/brandBrain';
-
-/**
- * Parameters to create an initial Brand Brain profile.
- */
-export interface CreateBrandProfileParams {
-  readonly tenantId: string;
-  readonly companyId: string;
-  readonly identity: BrandBrainProfile['identity'];
-  readonly valueProposition: string;
-  readonly tone: BrandBrainProfile['tone'];
-  readonly values: string[];
-}
-
-/**
- * Partial update for a Brand Brain profile.
- * Only the fields provided will be updated.
- */
-export type UpdateBrandProfileParams = Partial<
-  Pick<
-    BrandBrainProfile,
-    | 'identity'
-    | 'valueProposition'
-    | 'tone'
-    | 'values'
-    | 'audiences'
-    | 'productsAndServices'
-    | 'differentiators'
-    | 'languageGuidelines'
-    | 'visualIdentity'
-  >
->;
+import type { BrandBrain } from '../../types/brandBrain';
 
 /**
  * Contract for managing Brand Brain profiles.
@@ -43,28 +12,26 @@ export type UpdateBrandProfileParams = Partial<
  */
 export interface IBrandBrainService {
   /**
-   * Create a new Brand Brain profile for a company.
-   * Only one profile per company is expected.
+   * Retrieves a Brand Brain by ID.
    */
-  createProfile(params: CreateBrandProfileParams): Promise<BrandBrainProfile>;
+  getProfile(id: string): Promise<BrandBrain | null>;
 
   /**
-   * Retrieve the Brand Brain profile for a company.
+   * Retrieves a Brand Brain by Conversation ID.
    */
-  getProfile(tenantId: string, companyId: string): Promise<BrandBrainProfile | null>;
+  getBrandBrainByConversation(conversationId: string): Promise<BrandBrain | null>;
 
   /**
-   * Update an existing Brand Brain profile.
+   * Generates or updates a Brand Brain from a set of structured conversation context.
    */
-  updateProfile(
-    profileId: string,
-    updates: UpdateBrandProfileParams,
-  ): Promise<BrandBrainProfile>;
+  buildBrandBrain(
+    conversationId: string,
+    context: Record<string, unknown>,
+    explicitConfirmations?: Record<string, boolean>
+  ): Promise<BrandBrain>;
 
   /**
-   * Check whether a Brand Brain profile exists for a company.
+   * Check whether a Brand Brain exists for a conversation.
    */
-  hasProfile(tenantId: string, companyId: string): Promise<boolean>;
+  hasProfile(conversationId: string): Promise<boolean>;
 }
-
-

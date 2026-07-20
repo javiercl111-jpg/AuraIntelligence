@@ -9,13 +9,14 @@ import TypingIndicator from './TypingIndicator';
 import ExecutiveReflectionCard from './ExecutiveReflectionCard';
 import ExecutiveProposalCard from './ExecutiveProposalCard';
 import GrowthObjectiveSummary from './GrowthObjectiveSummary';
+import BrandBrainSummary from './BrandBrainSummary';
 
 interface ExecutiveConversationPageProps {
   onClose: () => void;
 }
 
 export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps> = ({ onClose }) => {
-  const { conversation, turns, objective, isTyping, error, start, addTurn } = useGrowthConversation();
+  const { conversation, turns, objective, brandBrain, isTyping, error, start, addTurn } = useGrowthConversation();
   const [inputValue, setInputValue] = useState('');
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
@@ -85,9 +86,10 @@ export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps>
               <ConversationBubble content={turn.content} role={turn.role} />
               
               {/* Inject Objective Summary before Reflection Card */}
-              {isLastTurn && turn.role === 'assistant' && conversation.currentStage === 'executive_reflection' && objective && (
-                <div className="mb-4">
-                  <GrowthObjectiveSummary objective={objective} />
+              {isLastTurn && turn.role === 'assistant' && conversation.currentStage === 'executive_reflection' && (
+                <div className="mb-4 flex flex-col gap-6">
+                  {objective && <GrowthObjectiveSummary objective={objective} />}
+                  {brandBrain && <BrandBrainSummary brain={brandBrain} />}
                   <ExecutiveReflectionCard context={conversation.structuredContext} />
                 </div>
               )}

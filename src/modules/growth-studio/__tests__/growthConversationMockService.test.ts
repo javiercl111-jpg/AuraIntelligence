@@ -114,6 +114,44 @@ describe('GrowthConversationMockService', () => {
     expect(updatedConv?.structuredContext.audience).toBe('cambiar audiencia a Pymes');
   });
 
+  it('debe permitir corregir un dato del Brand Brain en la fase executive_reflection', async () => {
+    // 1. Iniciar conversación
+    const startedConv = await growthConversationService.startConversation({
+      tenantId: 'test', companyId: 'test', userId: 'test'
+    });
+    const convId = startedConv.id;
+
+    // 2. Llegar a executive_reflection
+    await growthConversationService.addTurn({ conversationId: convId, content: 'vender producto', role: 'user' });
+    await growthConversationService.generateAssistantResponse(convId);
+    await growthConversationService.addTurn({ conversationId: convId, content: 'Aura HCM', role: 'user' });
+    await growthConversationService.generateAssistantResponse(convId);
+    await growthConversationService.addTurn({ conversationId: convId, content: 'Hoteles', role: 'user' });
+    await growthConversationService.generateAssistantResponse(convId);
+    await growthConversationService.addTurn({ conversationId: convId, content: 'México', role: 'user' });
+    await growthConversationService.generateAssistantResponse(convId);
+    await growthConversationService.addTurn({ conversationId: convId, content: 'Aumentar ventas 20%', role: 'user' });
+    await growthConversationService.generateAssistantResponse(convId);
+
+    let conv = await growthConversationService.getConversation(convId);
+    expect(conv?.currentStage).toBe('executive_reflection');
+
+    // 3. Corregir industria (Brand Brain)
+    await growthConversationService.addTurn({ conversationId: convId, content: 'cambiar industria a Software B2B', role: 'user' });
+    await growthConversationService.generateAssistantResponse(convId);
+    conv = await growthConversationService.getConversation(convId);
+
+    // Debería quedarse en reflection y capturar industria
+    expect(conv?.currentStage).toBe('executive_reflection');
+    expect(conv?.structuredContext.additionalData?.industry).toBe('cambiar industria a Software B2B');
+
+    // 4. Confirmar
+    await growthConversationService.addTurn({ conversationId: convId, content: 'sí, es correcto', role: 'user' });
+    await growthConversationService.generateAssistantResponse(convId);
+    conv = await growthConversationService.getConversation(convId);
+    expect(conv?.currentStage).toBe('executive_proposal');
+  });
+
   it('rejects empty input', async () => {
     const conv = await growthConversationService.startConversation({
       tenantId: 'test', companyId: 'test', userId: 'test'

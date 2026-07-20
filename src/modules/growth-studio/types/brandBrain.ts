@@ -1,189 +1,64 @@
 // ─────────────────────────────────────────────────────────────
-// Aura Growth Studio™ — Brand Brain Profile
+// Aura Growth Studio™ — Brand Brain Lite
 // ─────────────────────────────────────────────────────────────
 
-/**
- * Confidence level for a brand brain data source.
- */
-export type BrandDataConfidence =
-  | 'verified'
-  | 'inferred'
-  | 'user_provided'
-  | 'unknown';
+export type BrandBrainFieldStatus = 'confirmed' | 'inferred' | 'missing';
+export type BrandBrainConfidence = 'low' | 'medium' | 'high';
 
-/**
- * Provenance record for a piece of brand information.
- */
-export interface BrandDataProvenance {
-  /** Where this data came from. */
-  source: string;
+export interface BrandBrainField<T> {
+  value: T | null;
+  status: BrandBrainFieldStatus;
+  confidence: BrandBrainConfidence;
+  source?: string;
+  evidence?: string;
+}
 
-  /** Confidence level in the data accuracy. */
-  confidence: BrandDataConfidence;
+export interface KnownFact {
+  field: string;
+  value: unknown;
+  source?: string;
+  status: BrandBrainFieldStatus;
+}
 
-  /** ISO 8601 timestamp when this data was last verified. */
-  lastVerifiedAt: string | null;
+export interface KnowledgeGap {
+  field: string;
+  label: string;
+  importance: 'high' | 'medium' | 'low';
+}
+
+export interface CompanyProfile {
+  companyName: BrandBrainField<string>;
+  businessDescription: BrandBrainField<string>;
 }
 
 /**
- * Brand identity description.
+ * Represents the Brand Identity extracted from conversation.
  */
-export interface BrandIdentity {
-  /** Brand name. */
-  name: string;
-
-  /** Brand tagline or slogan. */
-  tagline: string;
-
-  /** Mission statement. */
-  mission: string;
-
-  /** Vision statement. */
-  vision: string;
-
-  /** Provenance of this identity data. */
-  provenance: BrandDataProvenance;
-}
-
-/**
- * Voice and tone configuration for brand communications.
- */
-export interface BrandTone {
-  /** Primary tone descriptor (e.g. "professional", "conversational"). */
-  primary: string;
-
-  /** Secondary tone descriptors. */
-  secondary: string[];
-
-  /** Formality level from 1 (casual) to 5 (very formal). */
-  formalityLevel: 1 | 2 | 3 | 4 | 5;
-
-  /** Example phrases that reflect the desired tone. */
-  examplePhrases: string[];
-}
-
-/**
- * Language guidelines for brand content.
- */
-export interface BrandLanguageGuidelines {
-  /** Preferred terms and phrases. */
-  preferredTerms: string[];
-
-  /** Prohibited terms and phrases. */
-  prohibitedTerms: string[];
-
-  /** Primary language code (e.g. "es", "en"). */
-  primaryLanguage: string;
-
-  /** Supported secondary languages. */
-  secondaryLanguages: string[];
-}
-
-/**
- * Target audience definition.
- */
-export interface BrandAudience {
-  /** Audience segment name. */
-  name: string;
-
-  /** Description of this audience segment. */
-  description: string;
-
-  /** Key pain points for this audience. */
-  painPoints: string[];
-
-  /** Communication preferences. */
-  preferredChannels: string[];
-}
-
-/**
- * Product or service entry for brand context.
- */
-export interface BrandProductOrService {
-  /** Name of the product or service. */
-  name: string;
-
-  /** Short description. */
-  description: string;
-
-  /** Key differentiators. */
-  differentiators: string[];
-
-  /** Value proposition for this product. */
-  valueProposition: string;
-}
-
-/**
- * Visual identity reference (not the assets themselves).
- */
-export interface BrandVisualIdentityRef {
-  /** Primary brand color (hex). */
-  primaryColor: string;
-
-  /** Secondary brand colors (hex). */
-  secondaryColors: string[];
-
-  /** Logo asset reference (URL or asset ID). */
-  logoRef: string | null;
-
-  /** Typography preferences. */
-  typography: string[];
-}
-
-/**
- * Complete Brand Brain profile representing an organization's
- * brand knowledge and communication guidelines.
- *
- * This profile feeds AI-generated content to ensure alignment
- * with the brand identity, tone, and values.
- */
-export interface BrandBrainProfile {
-  /** Unique identifier. */
+export interface BrandBrain {
   readonly id: string;
-
-  /** Tenant that owns this profile. */
   readonly tenantId: string;
-
-  /** Company within the tenant. */
   readonly companyId: string;
 
-  /** Brand identity. */
-  identity: BrandIdentity;
+  companyProfile: CompanyProfile;
+  industry: BrandBrainField<string>;
+  products: BrandBrainField<string[]>;
+  valueProposition: BrandBrainField<string>;
+  targetAudience: BrandBrainField<string>;
+  brandTone: BrandBrainField<string>;
+  differentiators: BrandBrainField<string[]>;
+  communicationStyle: BrandBrainField<string>;
+  businessGoals: BrandBrainField<string[]>;
 
-  /** Value proposition summary. */
-  valueProposition: string;
+  knownFacts: KnownFact[];
+  missingKnowledge: KnowledgeGap[];
 
-  /** Voice and tone configuration. */
-  tone: BrandTone;
+  /**
+   * "Nivel de conocimiento de marca" (0-100).
+   * 100% for confirmed, 40% for inferred, 0% for missing.
+   * Based on weighted fields.
+   */
+  confidenceScore: number;
 
-  /** Core brand values. */
-  values: string[];
-
-  /** Target audiences. */
-  audiences: BrandAudience[];
-
-  /** Products or services. */
-  productsAndServices: BrandProductOrService[];
-
-  /** Key differentiators. */
-  differentiators: string[];
-
-  /** Language guidelines. */
-  languageGuidelines: BrandLanguageGuidelines;
-
-  /** Visual identity references. */
-  visualIdentity: BrandVisualIdentityRef;
-
-  /** Overall confidence and provenance. */
-  dataProvenance: BrandDataProvenance;
-
-  /** Schema version for forward compatibility. */
-  readonly schemaVersion: number;
-
-  /** ISO 8601 creation timestamp. */
   readonly createdAt: string;
-
-  /** ISO 8601 last update timestamp. */
   updatedAt: string;
 }
-

@@ -32,15 +32,13 @@ export type {
 
 // Brand Brain
 export type {
-  BrandBrainProfile,
-  BrandIdentity,
-  BrandTone,
-  BrandLanguageGuidelines,
-  BrandAudience,
-  BrandProductOrService,
-  BrandVisualIdentityRef,
-  BrandDataProvenance,
-  BrandDataConfidence,
+  BrandBrainFieldStatus,
+  BrandBrainConfidence,
+  BrandBrainField,
+  KnownFact,
+  KnowledgeGap,
+  CompanyProfile,
+  BrandBrain
 } from './brandBrain';
 
 // Growth Approval

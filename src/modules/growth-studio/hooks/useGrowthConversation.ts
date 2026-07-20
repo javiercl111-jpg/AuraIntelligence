@@ -5,13 +5,16 @@
 import { useState, useCallback } from 'react';
 import type { GrowthConversation, GrowthConversationTurn } from '../types/growthConversation';
 import type { GrowthObjective } from '../types/growthObjective';
+import type { BrandBrain } from '../types/brandBrain';
 import { growthConversationService } from '../services/growthConversationMockService';
 import { growthObjectiveService } from '../services/growthObjectiveMockService';
+import { brandBrainMockService } from '../services/brandBrainMockService';
 
 export const useGrowthConversation = () => {
   const [conversation, setConversation] = useState<GrowthConversation | null>(null);
   const [turns, setTurns] = useState<GrowthConversationTurn[]>([]);
   const [objective, setObjective] = useState<GrowthObjective | null>(null);
+  const [brandBrain, setBrandBrain] = useState<BrandBrain | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,9 +69,35 @@ export const useGrowthConversation = () => {
         // 3. Update Objective if in reflection or proposal phase
         if (updatedConv.currentStage === 'executive_reflection' || updatedConv.currentStage === 'executive_proposal' || updatedConv.currentStage === 'completed') {
           // If we transitioned to proposal/completed, the user confirmed it.
-          const isConfirmed = updatedConv.currentStage === 'executive_proposal' || updatedConv.currentStage === 'completed';
-          const newObj = await growthObjectiveService.buildAndSaveObjective(updatedConv.id, updatedConv.structuredContext, isConfirmed);
-          setObjective(newObj);
+          const isConfirmed = updatedConv.currentStage !== 'executive_reflection';
+          const obj = await growthObjectiveService.buildAndSaveObjective(
+            conversation.id,
+            updatedConv.structuredContext,
+            isConfirmed
+          );
+          setObjective(obj);
+
+          // Build Brand Brain
+          // During reflection, if we have explicit confirmations, we pass them.
+          // For now, we simulate an explicitConfirmation if isConfirmed is true (user confirmed all).
+          const explicitConfirmations: Record<string, boolean> = {};
+          if (isConfirmed) {
+            explicitConfirmations['industry'] = true;
+            explicitConfirmations['products'] = true;
+            explicitConfirmations['valueProposition'] = true;
+            explicitConfirmations['targetAudience'] = true;
+            explicitConfirmations['brandTone'] = true;
+            explicitConfirmations['differentiators'] = true;
+            explicitConfirmations['communicationStyle'] = true;
+            explicitConfirmations['businessGoals'] = true;
+          }
+
+          const bb = await brandBrainMockService.buildBrandBrain(
+            conversation.id,
+            updatedConv.structuredContext,
+            explicitConfirmations
+          );
+          setBrandBrain(bb);
         }
       }
       
@@ -83,6 +112,7 @@ export const useGrowthConversation = () => {
     conversation,
     turns,
     objective,
+    brandBrain,
     isTyping,
     error,
     start,
