@@ -11,6 +11,8 @@ import { growthConversationService } from '../services/growthConversationMockSer
 import { growthObjectiveService } from '../services/growthObjectiveMockService';
 import { brandBrainMockService } from '../services/brandBrainMockService';
 import { campaignStrategyMockService } from '../services/campaignStrategyMockService';
+import type { ExecutiveExecutionPlan } from '../types/executiveExecutionPlan';
+import { executiveExecutionPlanMockService } from '../services/executiveExecutionPlanMockService';
 
 export const useGrowthConversation = () => {
   const [conversation, setConversation] = useState<GrowthConversation | null>(null);
@@ -18,6 +20,7 @@ export const useGrowthConversation = () => {
   const [objective, setObjective] = useState<GrowthObjective | null>(null);
   const [brandBrain, setBrandBrain] = useState<BrandBrain | null>(null);
   const [campaignStrategy, setCampaignStrategy] = useState<CampaignStrategy | null>(null);
+  const [executionPlan, setExecutionPlan] = useState<ExecutiveExecutionPlan | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -111,6 +114,10 @@ export const useGrowthConversation = () => {
             updatedConv.id
           );
           setCampaignStrategy(strategy);
+
+          // Build Executive Execution Plan
+          const plan = await executiveExecutionPlanMockService.generatePlan(conversation.id);
+          setExecutionPlan(plan);
         }
       }
       
@@ -127,6 +134,7 @@ export const useGrowthConversation = () => {
     objective,
     brandBrain,
     campaignStrategy,
+    executionPlan,
     isTyping,
     error,
     start,

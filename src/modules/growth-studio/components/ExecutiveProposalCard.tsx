@@ -4,12 +4,15 @@
 
 import React from 'react';
 import type { GrowthStructuredContext } from '../types/growthConversation';
+import type { ExecutiveExecutionPlan } from '../types/executiveExecutionPlan';
+import { PlayCircle, AlertTriangle, ShieldCheck, ShieldAlert } from 'lucide-react';
 
 interface ExecutiveProposalCardProps {
   context: GrowthStructuredContext;
+  plan?: ExecutiveExecutionPlan | null;
 }
 
-export const ExecutiveProposalCard: React.FC<ExecutiveProposalCardProps> = ({ context }) => {
+export const ExecutiveProposalCard: React.FC<ExecutiveProposalCardProps> = ({ context, plan }) => {
   return (
     <div className="w-full max-w-2xl mx-auto my-6 p-8 rounded-2xl border border-emerald-400/40 bg-gradient-to-br from-emerald-950/60 to-black shadow-2xl shadow-emerald-900/20">
       <div className="text-center mb-6">
@@ -33,6 +36,43 @@ export const ExecutiveProposalCard: React.FC<ExecutiveProposalCardProps> = ({ co
             Se priorizará un mensaje de autoridad y confianza, buscando lograr <strong>{context.expectedResult || 'N/A'}</strong>. Esta es una propuesta simulada sin IA real, diseñada para validar la fundación de Aura Growth Studio™.
           </p>
         </div>
+
+        {plan && (
+          <>
+            <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+              <h4 className="text-sm font-semibold text-emerald-300 mb-4 flex items-center gap-2">
+                Preparación para Ejecutar
+                {plan.isBlocked ? <ShieldAlert size={16} className="text-red-400" /> : <ShieldCheck size={16} className="text-emerald-400" />}
+              </h4>
+              <p className="text-sm text-emerald-50/80 leading-relaxed mb-4">
+                El plan tiene un readiness de <strong>{plan.executionReadiness}%</strong>. {plan.executionReadinessReason}
+              </p>
+
+              {plan.missingDependencies.filter(d => d.criticality === 'blocker').length > 0 && (
+                <div className="mb-4">
+                  <p className="text-xs font-bold text-red-400 mb-1 flex items-center gap-1"><AlertTriangle size={12}/> Dependencias críticas bloqueantes:</p>
+                  <ul className="list-disc list-inside text-xs text-red-200/80 ml-1">
+                    {plan.missingDependencies.filter(d => d.criticality === 'blocker').map(d => (
+                      <li key={d.id}>{d.description}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-400/30">
+              <h4 className="text-sm font-semibold text-emerald-300 mb-2 flex items-center gap-2">
+                <PlayCircle size={16} /> Próxima Acción Inmediata
+              </h4>
+              <p className="text-sm text-emerald-50/90 font-medium">
+                {plan.nextRecommendedAction ? plan.nextRecommendedAction.title : 'Revisar y aprobar plan de ejecución'}
+              </p>
+              <p className="text-xs text-emerald-50/50 mt-1 capitalize">
+                Fase recomendada: {plan.nextRecommendedAction ? plan.nextRecommendedAction.phase.replace('_', ' ') : 'Preparación'}
+              </p>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

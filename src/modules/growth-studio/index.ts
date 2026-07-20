@@ -13,6 +13,12 @@ export { default as BrandBrainSummary } from './components/BrandBrainSummary';
 export { default as BrandBrainCard } from './components/BrandBrainCard';
 export { default as KnowledgeGapCard } from './components/KnowledgeGapCard';
 export { default as ConfidenceIndicator } from './components/ConfidenceIndicator';
+export { ExecutiveExecutionPlanSummary } from './components/ExecutiveExecutionPlanSummary';
+export { ExecutiveExecutionPlanCard } from './components/ExecutiveExecutionPlanCard';
+export { ExecutionReadinessIndicator } from './components/ExecutionReadinessIndicator';
+export { ExecutionTimeline } from './components/ExecutionTimeline';
+export { NextRecommendedActionCard } from './components/NextRecommendedActionCard';
+export { ExecutionRisksCard } from './components/ExecutionRisksCard';
 export * from './types/growthConversation';
 export * from './types/growthObjective';
 
@@ -62,6 +68,16 @@ export type {
   GrowthMetricDataPoint,
   GrowthMetricType,
   AnalyticsTimeRange,
+  ExecutiveExecutionArtifactStatus,
+  FieldConfidenceStatus,
+  ExecutionPhaseId,
+  ExecutionPhaseState,
+  ConfidentField,
+  ExecutionAction,
+  ExecutionDependency,
+  ExecutionRisk,
+  StrategicPhase,
+  ExecutiveExecutionPlan,
 } from './types';
 
 // Service Contracts
@@ -71,5 +87,6 @@ export type { ICampaignService } from './services/contracts/ICampaignService';
 export type { IGrowthApprovalService } from './services/contracts/IGrowthApprovalService';
 export type { IPublisherService } from './services/contracts/IPublisherService';
 export type { IGrowthAIProvider } from './services/contracts/IGrowthAIProvider';
+export type { IExecutiveExecutionPlanService } from './services/contracts/IExecutiveExecutionPlanService';
 
 export default {};

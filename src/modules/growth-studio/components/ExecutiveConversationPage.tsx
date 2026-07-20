@@ -11,13 +11,14 @@ import ExecutiveProposalCard from './ExecutiveProposalCard';
 import GrowthObjectiveSummary from './GrowthObjectiveSummary';
 import BrandBrainSummary from './BrandBrainSummary';
 import CampaignStrategySummary from './CampaignStrategySummary';
+import { ExecutiveExecutionPlanSummary } from './ExecutiveExecutionPlanSummary';
 
 interface ExecutiveConversationPageProps {
   onClose: () => void;
 }
 
 export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps> = ({ onClose }) => {
-  const { conversation, turns, objective, brandBrain, campaignStrategy, isTyping, error, start, addTurn } = useGrowthConversation();
+  const { conversation, turns, objective, brandBrain, campaignStrategy, executionPlan, isTyping, error, start, addTurn } = useGrowthConversation();
   const [inputValue, setInputValue] = useState('');
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
@@ -92,13 +93,14 @@ export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps>
                   {objective && <GrowthObjectiveSummary objective={objective} />}
                   {brandBrain && <BrandBrainSummary brain={brandBrain} />}
                   {campaignStrategy && <CampaignStrategySummary strategy={campaignStrategy} />}
+                  {executionPlan && <ExecutiveExecutionPlanSummary plan={executionPlan} />}
                   <ExecutiveReflectionCard context={conversation.structuredContext} />
                 </div>
               )}
               
               {/* Inject Proposal Card after assistant introduces it */}
               {isLastTurn && turn.role === 'assistant' && (conversation.currentStage === 'executive_proposal' || conversation.currentStage === 'completed') && (
-                <ExecutiveProposalCard context={conversation.structuredContext} />
+                <ExecutiveProposalCard context={conversation.structuredContext} plan={executionPlan} />
               )}
             </React.Fragment>
           );

@@ -72,4 +72,18 @@ export type {
   CampaignStrategy,
 } from './campaignStrategy';
 
+// Executive Execution Plan
+export type {
+  ExecutiveExecutionArtifactStatus,
+  FieldConfidenceStatus,
+  ExecutionPhaseId,
+  ExecutionPhaseState,
+  ConfidentField,
+  ExecutionAction,
+  ExecutionDependency,
+  ExecutionRisk,
+  StrategicPhase,
+  ExecutiveExecutionPlan,
+} from './executiveExecutionPlan';
+
 export default {};
