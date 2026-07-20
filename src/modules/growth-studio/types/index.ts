@@ -97,4 +97,22 @@ export type {
   ContentPlan
 } from './contentPlan';
 
+// Executive Content Brief
+export type {
+  ExecutiveIntent,
+  BriefStatus,
+  ConstraintType,
+  ChecklistStatus,
+  NextActionType,
+  SelectedAsset,
+  OriginArtifact,
+  SupportingEvidence,
+  Constraint,
+  SuccessCriterion,
+  AcceptanceChecklist,
+  BlockingReason,
+  NextGenerationAction,
+  ExecutiveContentBrief
+} from './executiveContentBrief';
+
 export default {};

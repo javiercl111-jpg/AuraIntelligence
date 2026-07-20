@@ -8,7 +8,7 @@ interface ReadinessIndicatorProps {
 export const ReadinessIndicator: React.FC<ReadinessIndicatorProps> = ({ score, reason }) => {
   let color = 'bg-red-500';
   let label = 'No preparado';
-  
+
   if (score >= 40 && score < 80) {
     color = 'bg-yellow-500';
     label = 'En revisión';
@@ -25,7 +25,7 @@ export const ReadinessIndicator: React.FC<ReadinessIndicatorProps> = ({ score, r
           {label}
         </span>
       </div>
-      
+
       <div className="relative pt-1">
         <div className="flex mb-2 items-center justify-between">
           <div>
@@ -43,7 +43,7 @@ export const ReadinessIndicator: React.FC<ReadinessIndicatorProps> = ({ score, r
           <div style={{ width: `${score}%` }} className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${color} transition-all duration-1000`}></div>
         </div>
       </div>
-      
+
       <p className="text-sm text-gray-600 italic">
         {reason}
       </p>

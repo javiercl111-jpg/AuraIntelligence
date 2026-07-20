@@ -13,7 +13,7 @@ describe('GrowthObjectiveBuilder', () => {
 
   it('should correctly calculate completion percentage and weights', () => {
     const objective = GrowthObjectiveBuilder.buildFromContext(mockContext);
-    
+
     // Critical (goal, product, audience, result) = 4 * 20 = 80
     // Recommended (region, horizon) = 1 (region) + 1 (default horizon) * 10 = 20
     // Total = 100

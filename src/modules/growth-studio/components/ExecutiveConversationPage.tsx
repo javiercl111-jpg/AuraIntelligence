@@ -13,13 +13,14 @@ import GrowthObjectiveSummary from './GrowthObjectiveSummary';
 import BrandBrainSummary from './BrandBrainSummary';
 import CampaignStrategySummary from './CampaignStrategySummary';
 import { ExecutiveExecutionPlanSummary } from './ExecutiveExecutionPlanSummary';
+import { ExecutiveContentBriefSummary } from './ExecutiveContentBriefSummary';
 
 interface ExecutiveConversationPageProps {
   onClose: () => void;
 }
 
 export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps> = ({ onClose }) => {
-  const { conversation, turns, objective, brandBrain, campaignStrategy, executionPlan, contentPlan, isTyping, error, start, addTurn } = useGrowthConversation();
+  const { conversation, turns, objective, brandBrain, campaignStrategy, execution, contentPlan, contentBrief, isTyping, error, start, addTurn } = useGrowthConversation();
   const [inputValue, setInputValue] = useState('');
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
@@ -44,7 +45,7 @@ export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps>
     return (
       <div className="p-8 text-center bg-[#0d1117] rounded-2xl border border-red-500/20">
         <p className="text-red-400 mb-4">{error}</p>
-        <button 
+        <button
           onClick={onClose}
           className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded transition-colors"
         >
@@ -70,7 +71,7 @@ export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps>
           <h2 className="text-lg font-bold text-white">Executive Growth Conversation</h2>
           <p className="text-xs text-emerald-300/70 tracking-widest uppercase">Mock Session (No AI)</p>
         </div>
-        <button 
+        <button
           onClick={onClose}
           className="text-emerald-400/60 hover:text-emerald-400 transition-colors"
           aria-label="Cerrar conversación"
@@ -83,31 +84,32 @@ export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps>
       <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
         {turns.map((turn, index) => {
           const isLastTurn = index === turns.length - 1;
-          
+
           return (
             <React.Fragment key={turn.id}>
               <ConversationBubble content={turn.content} role={turn.role} />
-              
+
               {/* Inject Objective Summary before Reflection Card */}
               {isLastTurn && turn.role === 'assistant' && conversation.currentStage === 'executive_reflection' && (
                 <div className="mb-4 flex flex-col gap-6">
                   {objective && <GrowthObjectiveSummary objective={objective} />}
                   {brandBrain && <BrandBrainSummary brain={brandBrain} />}
                   {campaignStrategy && <CampaignStrategySummary strategy={campaignStrategy} />}
-                  {executionPlan && <ExecutiveExecutionPlanSummary plan={executionPlan} />}
+                  {execution && <ExecutiveExecutionPlanSummary plan={execution} />}
                   {contentPlan && <ContentPlanSummary plan={contentPlan} />}
+                  {contentBrief && <ExecutiveContentBriefSummary brief={contentBrief} />}
                   <ExecutiveReflectionCard context={conversation.structuredContext} />
                 </div>
               )}
-              
+
               {/* Inject Proposal Card after assistant introduces it */}
               {isLastTurn && turn.role === 'assistant' && (conversation.currentStage === 'executive_proposal' || conversation.currentStage === 'completed') && (
-                <ExecutiveProposalCard context={conversation.structuredContext} plan={executionPlan} contentPlan={contentPlan} />
+                <ExecutiveProposalCard context={conversation.structuredContext} plan={execution} contentPlan={contentPlan} contentBrief={contentBrief} />
               )}
             </React.Fragment>
           );
         })}
-        
+
         {isTyping && (
           <div className="flex justify-start mb-4">
             <TypingIndicator />
@@ -125,8 +127,8 @@ export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps>
             onChange={(e) => setInputValue(e.target.value)}
             disabled={isTyping || conversation.status === 'completed'}
             placeholder={
-              conversation.status === 'completed' 
-                ? 'Conversación finalizada' 
+              conversation.status === 'completed'
+                ? 'Conversación finalizada'
                 : 'Escribe tu respuesta...'
             }
             className="flex-1 bg-[#1a202c]/50 border border-emerald-400/20 rounded-xl px-4 py-3 text-emerald-50 focus:outline-none focus:border-emerald-400/50 focus:ring-1 focus:ring-emerald-400/50 disabled:opacity-50"

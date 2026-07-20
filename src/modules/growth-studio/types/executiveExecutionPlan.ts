@@ -84,15 +84,15 @@ export interface ExecutiveExecutionPlan {
   executivePriorities: ConfidentField<string[]>;
   actionQueue: ExecutionAction[];
   campaignLaunchInputs: ConfidentField<string[]>;
-  
+
   // Dependencias
   dependencies: ExecutionDependency[];
   knownDependencies: ExecutionDependency[];
   missingDependencies: ExecutionDependency[];
-  
+
   // Riesgos
   executionRisks: ExecutionRisk[];
-  
+
   // Restricciones (opcionales)
   executionConstraints?: ExecutionConstraints;
 

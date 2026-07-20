@@ -15,7 +15,7 @@ export class CampaignStrategyValidator {
     if (strategy.readinessScore < 0 || strategy.readinessScore > 100) {
       errors.push(`Invalid readinessScore: ${strategy.readinessScore}`);
     }
-    
+
     if (strategy.strategyEvidenceScore < 0 || strategy.strategyEvidenceScore > 100) {
       errors.push(`Invalid strategyEvidenceScore: ${strategy.strategyEvidenceScore}`);
     }

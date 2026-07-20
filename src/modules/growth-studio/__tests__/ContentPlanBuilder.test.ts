@@ -4,21 +4,16 @@ import type { CampaignStrategy } from '../types/campaignStrategy';
 import type { GrowthObjective } from '../types/growthObjective';
 
 describe('ContentPlanBuilder', () => {
-  const mockObjective: GrowthObjective = {
+  const mockObjective = {
     id: 'obj-1',
     schemaVersion: 1,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     goal: 'Aumentar ventas',
-    targetMetrics: [],
-    timeline: '',
-    constraints: [],
-    isBlocked: false,
-    readinessScore: 100,
-    readinessReason: ''
-  };
+    constraints: []
+  } as unknown as GrowthObjective;
 
-  const mockStrategy: CampaignStrategy = {
+  const mockStrategy = {
     id: 'strat-1',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -27,14 +22,11 @@ describe('ContentPlanBuilder', () => {
     coreMessage: { value: 'Msg', status: 'confirmed' },
     recommendedChannels: { value: ['Web', 'Email'], status: 'confirmed' },
     recommendedContentTypes: { value: ['Landing', 'Video'], status: 'confirmed' },
-    contentThemes: { value: [], status: 'confirmed' },
     callsToAction: { value: ['Comprar'], status: 'confirmed' },
     executionConstraints: { budget: 1000, timeframe: '1m', resources: [] },
     strategyRisks: [],
-    strategyReadiness: 100,
-    strategyReadinessReason: '',
-    isBlocked: false
-  };
+    strategyReadinessReason: ''
+  } as unknown as CampaignStrategy;
 
   it('builds a linear DAG (AssetPipeline) for recommendedContentTypes', () => {
     const plan = ContentPlanBuilder.build(mockObjective, null, mockStrategy, null, 'conv-1');

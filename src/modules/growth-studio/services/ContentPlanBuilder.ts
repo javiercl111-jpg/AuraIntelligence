@@ -15,9 +15,9 @@ import { calculateContentReadiness } from './ContentPlanValidator';
 export class ContentPlanBuilder {
   static build(
     objective: GrowthObjective | null,
-    brand: BrandBrain | null,
+    _brand: BrandBrain | null,
     strategy: CampaignStrategy | null,
-    execution: ExecutiveExecutionPlan | null,
+    _execution: ExecutiveExecutionPlan | null,
     conversationId: string
   ): ContentPlan {
     const productionInputs = this.extractProductionInputs(strategy);

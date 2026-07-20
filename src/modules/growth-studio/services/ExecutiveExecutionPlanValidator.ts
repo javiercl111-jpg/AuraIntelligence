@@ -29,7 +29,7 @@ export function calculateExecutionReadiness(plan: ExecutiveExecutionPlan): Readi
 
   // 1. executionGoal: 20
   score += 20 * getMultiplier(plan.executionGoal.status);
-  
+
   // 2. businessJustification: 10
   score += 10 * getMultiplier(plan.businessJustification.status);
 

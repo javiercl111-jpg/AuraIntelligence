@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { 
-  growthConversationService, 
-  setMockResponseDelay 
+import {
+  growthConversationService,
+  setMockResponseDelay
 } from '../services/growthConversationMockService';
 
 describe('GrowthConversationMockService', () => {

@@ -34,15 +34,15 @@ export const ExecutiveExecutionPlanSummary: React.FC<ExecutiveExecutionPlanSumma
 
       <div className="grid gap-6 lg:grid-cols-3 relative z-10">
         <div className="lg:col-span-2 space-y-6">
-          <ExecutionReadinessIndicator 
-            score={plan.executionReadiness} 
-            reason={plan.executionReadinessReason} 
-            isBlocked={plan.isBlocked} 
+          <ExecutionReadinessIndicator
+            score={plan.executionReadiness}
+            reason={plan.executionReadinessReason}
+            isBlocked={plan.isBlocked}
           />
           <NextRecommendedActionCard action={plan.nextRecommendedAction} />
           <ExecutiveExecutionPlanCard plan={plan} />
         </div>
-        
+
         <div className="space-y-6">
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
             <h3 className="font-bold text-white mb-6">Timeline Estratégico</h3>

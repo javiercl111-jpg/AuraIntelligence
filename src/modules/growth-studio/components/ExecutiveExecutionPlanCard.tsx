@@ -19,9 +19,9 @@ export const ExecutiveExecutionPlanCard: React.FC<ExecutiveExecutionPlanCardProp
           </p>
           <span className="text-xs text-white/50">{plan.executionGoal.status}</span>
         </div>
-        
+
         <div className="h-px bg-white/10" />
-        
+
         <div>
           <h4 className="flex items-center gap-2 text-sm font-semibold text-emerald-300 mb-2">
             <BarChart2 size={16} /> Justificación de Negocio
@@ -33,7 +33,7 @@ export const ExecutiveExecutionPlanCard: React.FC<ExecutiveExecutionPlanCardProp
         </div>
 
         <div className="h-px bg-white/10" />
-        
+
         <div>
           <h4 className="flex items-center gap-2 text-sm font-semibold text-emerald-300 mb-2">
             <Hash size={16} /> Prioridades Ejecutivas (Canales)

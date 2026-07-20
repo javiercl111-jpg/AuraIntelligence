@@ -6,15 +6,17 @@ import React from 'react';
 import type { GrowthStructuredContext } from '../types/growthConversation';
 import type { ExecutiveExecutionPlan } from '../types/executiveExecutionPlan';
 import type { ContentPlan } from '../types/contentPlan';
-import { PlayCircle, AlertTriangle, ShieldCheck, ShieldAlert, FileText } from 'lucide-react';
+import type { ExecutiveContentBrief } from '../types/executiveContentBrief';
+import { PlayCircle, AlertTriangle, ShieldCheck, ShieldAlert, FileText, CheckCircle } from 'lucide-react';
 
 interface ExecutiveProposalCardProps {
   context: GrowthStructuredContext;
   plan?: ExecutiveExecutionPlan | null;
   contentPlan?: ContentPlan | null;
+  contentBrief?: ExecutiveContentBrief | null;
 }
 
-export const ExecutiveProposalCard: React.FC<ExecutiveProposalCardProps> = ({ context, plan, contentPlan }) => {
+export const ExecutiveProposalCard: React.FC<ExecutiveProposalCardProps> = ({ context, plan, contentPlan, contentBrief }) => {
   return (
     <div className="w-full max-w-2xl mx-auto my-6 p-8 rounded-2xl border border-emerald-400/40 bg-gradient-to-br from-emerald-950/60 to-black shadow-2xl shadow-emerald-900/20">
       <div className="text-center mb-6">
@@ -92,6 +94,24 @@ export const ExecutiveProposalCard: React.FC<ExecutiveProposalCardProps> = ({ co
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {contentBrief && (
+          <div className={`p-4 rounded-lg border ${
+            contentBrief.status === 'approved'
+              ? 'bg-emerald-500/10 border-emerald-400/30'
+              : 'bg-indigo-500/10 border-indigo-400/30'
+          }`}>
+            <h4 className={`text-sm font-semibold mb-2 flex items-center gap-2 ${
+              contentBrief.status === 'approved' ? 'text-emerald-300' : 'text-amber-300'
+            }`}>
+              <CheckCircle size={16} />
+              {contentBrief.status === 'approved' ? 'Brief Aprobado' : 'Brief Propuesto para Revisión'}
+            </h4>
+            <p className="text-sm text-emerald-50/80">
+              Activo: <strong>{contentBrief.selectedAsset?.title || 'Sin asignar'}</strong>
+            </p>
           </div>
         )}
       </div>

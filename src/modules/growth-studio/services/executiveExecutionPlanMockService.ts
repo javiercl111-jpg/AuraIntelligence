@@ -20,7 +20,7 @@ class ExecutiveExecutionPlanMockService implements IExecutiveExecutionPlanServic
     const objective = await growthObjectiveService.getObjective(`go_${conversationId}`);
     const brand = await brandBrainMockService.getBrandBrainByConversation(conversationId);
     const strategy = await campaignStrategyMockService.getStrategy(conversationId);
-    
+
     const plan = ExecutiveExecutionPlanBuilder.build(objective, brand, strategy, conversationId);
     await this.savePlan(plan);
     return plan;

@@ -86,7 +86,7 @@ describe('ExecutiveExecutionPlanValidator', () => {
   it('applies exact executionRisks multipliers', () => {
     // 1.0 (no risks)
     const resultNoRisks = calculateExecutionReadiness(basePlan);
-    
+
     // 0.4 (has risks, but not critical unmitigated)
     const planWithParialRisks: ExecutiveExecutionPlan = {
       ...basePlan,
@@ -94,7 +94,7 @@ describe('ExecutiveExecutionPlanValidator', () => {
     };
     const resultPartialRisks = calculateExecutionReadiness(planWithParialRisks);
     expect(resultPartialRisks.score).toBe(resultNoRisks.score - 6); // 10 * 1.0 vs 10 * 0.4 = 10 vs 4 (diff 6)
-    
+
     // 0.0 (has critical unmitigated risk)
     const planWithCriticalRisk: ExecutiveExecutionPlan = {
       ...basePlan,

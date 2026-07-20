@@ -1,9 +1,9 @@
 import type { GrowthObjective } from '../types/growthObjective';
 import type { BrandBrain } from '../types/brandBrain';
 import type { CampaignStrategy } from '../types/campaignStrategy';
-import type { 
-  ExecutiveExecutionPlan, 
-  StrategicPhase, 
+import type {
+  ExecutiveExecutionPlan,
+  StrategicPhase,
   ExecutionAction,
   ExecutionDependency,
   ExecutionRisk,
@@ -23,16 +23,16 @@ export class ExecutiveExecutionPlanBuilder {
     const dependencies = this.extractDependencies(objective, brand, strategy);
     const knownDependencies = dependencies.filter(d => d.status === 'resolved');
     const missingDependencies = dependencies.filter(d => d.status === 'unresolved');
-    
+
     const executionRisks = this.extractExecutionRisks(strategy, missingDependencies);
-    
+
     const isReady = strategy && objective && brand;
     const executionGoalValue = isReady ? `Ejecutar campaña: ${strategy?.campaignObjective?.value || 'Estrategia general'}` : null;
     const executionGoalStatus: FieldConfidenceStatus = strategy?.campaignObjective?.status || 'missing';
-    
+
     const businessJustificationValue = isReady && objective?.goal ? `Justificado por objetivo de negocio: ${objective.goal}` : null;
     const businessJustificationStatus: FieldConfidenceStatus = objective?.goal ? 'confirmed' : 'missing';
-    
+
     const actionQueue = this.buildActionQueue(objective, brand, strategy, missingDependencies);
     const phases = this.buildStrategicPhases(actionQueue, dependencies, executionRisks);
 
@@ -43,7 +43,7 @@ export class ExecutiveExecutionPlanBuilder {
       schemaVersion: '1.0.0',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      
+
       executionGoal: {
         value: executionGoalValue,
         status: executionGoalStatus,
@@ -70,12 +70,12 @@ export class ExecutiveExecutionPlanBuilder {
       knownDependencies,
       missingDependencies,
       executionRisks,
-      
+
       executionConstraints: {
         budget: strategy?.executionConstraints?.budget?.toString() || undefined,
         timeframe: strategy?.executionConstraints?.timeframe || undefined,
       },
-      
+
       executionReadiness: 0,
       executionReadinessReason: '',
       isBlocked: false,
@@ -98,7 +98,7 @@ export class ExecutiveExecutionPlanBuilder {
     strategy: CampaignStrategy | null
   ): ExecutionDependency[] {
     const deps: ExecutionDependency[] = [];
-    
+
     // Growth Objective Dependency
     deps.push({
       id: 'dep-growth-obj',
@@ -286,7 +286,7 @@ export class ExecutiveExecutionPlanBuilder {
   }
 
   private static buildStrategicPhases(
-    actions: ExecutionAction[], 
+    actions: ExecutionAction[],
     dependencies: ExecutionDependency[],
     risks: ExecutionRisk[]
   ): StrategicPhase[] {
@@ -301,16 +301,16 @@ export class ExecutiveExecutionPlanBuilder {
     return defaultPhases.map(phaseDef => {
       const phaseActions = actions.filter(a => a.phase === phaseDef.id);
       const phaseDependencies = dependencies.filter(d => d.requiredForPhase === phaseDef.id);
-      
+
       // Calculate state for phase
       // A phase is blocked if it has unresolved blocker dependencies
       const hasBlocker = phaseDependencies.some(d => d.criticality === 'blocker' && d.status === 'unresolved');
       let state: ExecutionPhaseState = 'not_started';
-      
+
       if (hasBlocker) {
         state = 'blocked';
       } else if (phaseDef.id === 'preparation' && phaseDependencies.every(d => d.status === 'resolved')) {
-        state = 'ready'; 
+        state = 'ready';
       }
 
       return {
@@ -326,7 +326,7 @@ export class ExecutiveExecutionPlanBuilder {
 
   private static determineNextAction(plan: ExecutiveExecutionPlan): ExecutionAction | null {
     // 1. resolver dependencia crítica;
-    const blockerAction = plan.actionQueue.find(a => 
+    const blockerAction = plan.actionQueue.find(a =>
       a.dependencyIds.some(depId => {
         const dep = plan.missingDependencies.find(d => d.id === depId);
         return dep?.criticality === 'blocker';

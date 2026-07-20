@@ -26,8 +26,8 @@ const FieldRow = ({ label, value, isMissing, status }: { label: string; value?: 
           <MissingInformationBadge label={label} />
         ) : (
           <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border ${
-            status === 'confirmed' 
-              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+            status === 'confirmed'
+              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
               : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
           }`}>
             {status}

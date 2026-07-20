@@ -25,6 +25,13 @@ export { ContentReadinessIndicator } from './components/ContentReadinessIndicato
 export { AssetPipeline } from './components/AssetPipeline';
 export { NextRecommendedAssetCard } from './components/NextRecommendedAssetCard';
 export { ContentRisksCard } from './components/ContentRisksCard';
+export { ExecutiveContentBriefSummary } from './components/ExecutiveContentBriefSummary';
+export { ExecutiveContentBriefCard } from './components/ExecutiveContentBriefCard';
+export { EvidenceSummary } from './components/EvidenceSummary';
+export { ConstraintCard } from './components/ConstraintCard';
+export { SuccessCriteriaCard } from './components/SuccessCriteriaCard';
+export { BriefReadinessIndicator } from './components/BriefReadinessIndicator';
+export { NextGenerationActionCard } from './components/NextGenerationActionCard';
 export * from './types/growthConversation';
 export * from './types/growthObjective';
 
@@ -84,8 +91,8 @@ export type {
   ExecutionRisk,
   StrategicPhase,
   ExecutiveExecutionPlan,
-  ContentAssetStatus,
-  AssetPriority,
+  ContentAssetPhase,
+  ContentAssetPriority,
   ContentAsset,
   AssetDependencyGraph,
   ProductionInput,
@@ -102,5 +109,6 @@ export type { IPublisherService } from './services/contracts/IPublisherService';
 export type { IGrowthAIProvider } from './services/contracts/IGrowthAIProvider';
 export type { IExecutiveExecutionPlanService } from './services/contracts/IExecutiveExecutionPlanService';
 export type { IContentPlanService } from './services/contracts/IContentPlanService';
+export type { IExecutiveContentBriefService } from './services/contracts/IExecutiveContentBriefService';
 
 export default {};

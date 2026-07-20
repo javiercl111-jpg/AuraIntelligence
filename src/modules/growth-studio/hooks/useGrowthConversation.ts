@@ -15,6 +15,8 @@ import type { ExecutiveExecutionPlan } from '../types/executiveExecutionPlan';
 import { executiveExecutionPlanMockService } from '../services/executiveExecutionPlanMockService';
 import type { ContentPlan } from '../types/contentPlan';
 import { contentPlanMockService } from '../services/contentPlanMockService';
+import type { ExecutiveContentBrief } from '../types/executiveContentBrief';
+import { executiveContentBriefMockService } from '../services/executiveContentBriefMockService';
 
 export const useGrowthConversation = () => {
   const [conversation, setConversation] = useState<GrowthConversation | null>(null);
@@ -22,9 +24,11 @@ export const useGrowthConversation = () => {
   const [objective, setObjective] = useState<GrowthObjective | null>(null);
   const [brandBrain, setBrandBrain] = useState<BrandBrain | null>(null);
   const [campaignStrategy, setCampaignStrategy] = useState<CampaignStrategy | null>(null);
-  const [executionPlan, setExecutionPlan] = useState<ExecutiveExecutionPlan | null>(null);
+  const [execution, setExecution] = useState<ExecutiveExecutionPlan | null>(null);
   const [contentPlan, setContentPlan] = useState<ContentPlan | null>(null);
+  const [contentBrief, setContentBrief] = useState<ExecutiveContentBrief | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const start = useCallback(async () => {
@@ -43,6 +47,7 @@ export const useGrowthConversation = () => {
       setError(err instanceof Error ? err.message : 'Error al iniciar la conversación');
     } finally {
       setIsTyping(false);
+      setLoading(false);
     }
   }, []);
 
@@ -51,6 +56,7 @@ export const useGrowthConversation = () => {
     if (isTyping) return; // Rule: Block submission if already typing
     if (!content.trim()) return; // Rule: Reject empty submission
 
+    const conversationId = conversation.id;
     setIsTyping(true);
     setError(null);
     try {
@@ -71,7 +77,7 @@ export const useGrowthConversation = () => {
       // Update UI with assistant turn and new conversation state
       updatedTurns = await growthConversationService.getConversationTurns(conversation.id);
       setTurns(updatedTurns);
-      
+
       const updatedConv = await growthConversationService.getConversation(conversation.id);
       if (updatedConv) {
         setConversation(updatedConv);
@@ -119,15 +125,23 @@ export const useGrowthConversation = () => {
           setCampaignStrategy(strategy);
 
           // Build Executive Execution Plan
-          const plan = await executiveExecutionPlanMockService.generatePlan(conversation.id);
-          setExecutionPlan(plan);
+          const loadedExecution = await executiveExecutionPlanMockService.getPlan(conversationId);
+          setExecution(loadedExecution);
 
-          // Build Content Plan
-          const cPlan = await contentPlanMockService.generatePlan(conversation.id);
-          setContentPlan(cPlan);
+          let loadedContentPlan = await contentPlanMockService.getPlan(conversationId);
+          if (!loadedContentPlan && loadedExecution?.status === 'confirmed') {
+            loadedContentPlan = await contentPlanMockService.generatePlan(conversationId);
+          }
+          setContentPlan(loadedContentPlan);
+
+          let loadedBrief = await executiveContentBriefMockService.getBrief(conversationId);
+          if (!loadedBrief && loadedContentPlan) {
+            loadedBrief = await executiveContentBriefMockService.generateBrief(conversationId);
+          }
+          setContentBrief(loadedBrief);
         }
       }
-      
+
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al enviar el mensaje');
     } finally {
@@ -141,9 +155,11 @@ export const useGrowthConversation = () => {
     objective,
     brandBrain,
     campaignStrategy,
-    executionPlan,
+    execution,
     contentPlan,
+    contentBrief,
     isTyping,
+    loading,
     error,
     start,
     addTurn,

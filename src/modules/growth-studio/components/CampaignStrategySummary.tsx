@@ -27,7 +27,7 @@ const StrategyRisksCard: React.FC<StrategyRisksCardProps> = ({ risks }) => {
             <div className="flex justify-between items-center">
               <span className="text-xs font-bold text-red-600 uppercase tracking-wider">{risk.type} Risk</span>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                risk.impact === 'high' ? 'bg-red-200 text-red-800' : 
+                risk.impact === 'high' ? 'bg-red-200 text-red-800' :
                 risk.impact === 'medium' ? 'bg-orange-200 text-orange-800' : 'bg-yellow-200 text-yellow-800'
               }`}>
                 {risk.impact} Impact
@@ -75,8 +75,8 @@ export const CampaignStrategySummary: React.FC<CampaignStrategySummaryProps> = (
       <div className="mt-4 flex flex-col gap-6">
         <StrategyRisksCard risks={strategy.strategyRisks} />
         <AssumptionsCard assumptions={strategy.assumptions} />
-        <KnowledgeGapCard 
-          gaps={strategy.knowledgeGaps} 
+        <KnowledgeGapCard
+          gaps={strategy.knowledgeGaps}
           title="Vacíos de Estrategia"
           description="Información crítica faltante que Aura no pudo inferir con confianza."
         />

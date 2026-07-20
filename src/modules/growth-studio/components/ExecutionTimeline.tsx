@@ -17,7 +17,7 @@ export const ExecutionTimeline: React.FC<ExecutionTimelineProps> = ({ phases }) 
 
         let Icon = Circle;
         let colorClass = 'text-white/30';
-        
+
         if (isCompleted) {
           Icon = CheckCircle2;
           colorClass = 'text-emerald-400';
@@ -42,7 +42,7 @@ export const ExecutionTimeline: React.FC<ExecutionTimelineProps> = ({ phases }) 
                 {phase.label}
               </h4>
               <p className="text-xs text-white/50 mt-1 capitalize">{phase.state.replace('_', ' ')}</p>
-              
+
               {phase.actions.length > 0 && (
                 <div className="mt-2 text-xs text-white/70 space-y-1">
                   {phase.actions.map(action => (

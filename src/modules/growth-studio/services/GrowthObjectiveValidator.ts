@@ -11,7 +11,7 @@ export class GrowthObjectiveValidator {
    */
   public static validate(objective: Partial<GrowthObjective>): string[] {
     const errors: string[] = [];
-    
+
     if (!objective.goal?.trim()) errors.push('goal');
     if (!objective.productOrService?.trim()) errors.push('productOrService');
     if (!objective.audience?.trim()) errors.push('audience');

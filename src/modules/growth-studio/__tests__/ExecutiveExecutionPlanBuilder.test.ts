@@ -28,8 +28,8 @@ describe('ExecutiveExecutionPlanBuilder', () => {
     id: 'bb-1',
     tenantId: 't-1',
     companyId: 'c-1',
-    companyProfile: { 
-      companyName: { value: 'Tech', status: 'confirmed', confidence: 'high' }, 
+    companyProfile: {
+      companyName: { value: 'Tech', status: 'confirmed', confidence: 'high' },
       businessDescription: { value: 'Tech Desc', status: 'confirmed', confidence: 'high' }
     },
     industry: { value: 'Tech', status: 'confirmed', confidence: 'high' },
@@ -118,14 +118,14 @@ describe('ExecutiveExecutionPlanBuilder', () => {
   it('does not generate channels or actions without evidence', () => {
     const noChannelsStrategy = { ...mockStrategy, recommendedChannels: { value: [], status: 'confirmed' as const } };
     const plan = ExecutiveExecutionPlanBuilder.build(mockObjective, mockBrandBrain, noChannelsStrategy, 'conv-1');
-    
+
     // Al no haber canales, no debe generar acciones de configuración de canales
     expect(plan.actionQueue.some(a => a.title.includes('Configurar canales'))).toBe(false);
   });
 
   it('assigns states not_started, ready, and blocked properly to phases', () => {
     const plan = ExecutiveExecutionPlanBuilder.build(mockObjective, mockBrandBrain, mockStrategy, 'conv-1');
-    
+
     const preparation = plan.strategicPhases.find(p => p.id === 'preparation');
     const followUp = plan.strategicPhases.find(p => p.id === 'follow_up');
 

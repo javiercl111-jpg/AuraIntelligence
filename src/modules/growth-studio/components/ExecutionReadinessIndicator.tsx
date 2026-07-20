@@ -11,7 +11,7 @@ export const ExecutionReadinessIndicator: React.FC<ExecutionReadinessIndicatorPr
   let color = 'bg-blue-500';
   let textColor = 'text-blue-400';
   let Icon = Shield;
-  
+
   if (isBlocked) {
     color = 'bg-red-500';
     textColor = 'text-red-400';
@@ -37,16 +37,16 @@ export const ExecutionReadinessIndicator: React.FC<ExecutionReadinessIndicatorPr
           {isBlocked ? 'BLOQUEADO' : `${score}%`}
         </div>
       </div>
-      
+
       {!isBlocked && (
         <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden mb-4">
-          <div 
-            className={`h-full ${color} transition-all duration-1000`} 
-            style={{ width: `${score}%` }} 
+          <div
+            className={`h-full ${color} transition-all duration-1000`}
+            style={{ width: `${score}%` }}
           />
         </div>
       )}
-      
+
       <p className="text-sm text-white/60">{reason}</p>
     </div>
   );

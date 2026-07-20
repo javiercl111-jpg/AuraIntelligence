@@ -11,7 +11,7 @@ interface ConversationBubbleProps {
 
 export const ConversationBubble: React.FC<ConversationBubbleProps> = ({ content, role }) => {
   const isUser = role === 'user';
-  
+
   return (
     <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       <div

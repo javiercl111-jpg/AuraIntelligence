@@ -58,7 +58,7 @@ describe('CampaignStrategyBuilder', () => {
   it('does NOT recommend channels without explicit evidence', () => {
     const conv = getMockConversation(['Solo quiero vender más, no sé dónde.']);
     const strategy = CampaignStrategyBuilder.buildStrategy('t1', 'c1', getMockObjective(), getMockBrandBrain(), conv);
-    
+
     expect(strategy.recommendedChannels.status).toBe('missing');
     expect(strategy.recommendedChannels.value).toBeNull();
   });
@@ -66,7 +66,7 @@ describe('CampaignStrategyBuilder', () => {
   it('recommends channels ONLY when explicit evidence exists', () => {
     const conv = getMockConversation(['Mis clientes usan mucho Facebook y WhatsApp.']);
     const strategy = CampaignStrategyBuilder.buildStrategy('t1', 'c1', getMockObjective(), getMockBrandBrain(), conv);
-    
+
     expect(strategy.recommendedChannels.status).toBe('confirmed');
     expect(strategy.recommendedChannels.value).toContain('Facebook');
     expect(strategy.recommendedChannels.value).toContain('WhatsApp');
@@ -77,10 +77,10 @@ describe('CampaignStrategyBuilder', () => {
     const obj = getMockObjective(); // campaignObjective(20) + primaryAudience(15)
     const bb = getMockBrandBrain(); // coreMessage(15) + valueDrivers(10)
     // Total should be 20 + 15 + (15 * 0.4 = 6) + (10 * 0.4 = 4) = 45
-    
+
     const conv = getMockConversation([]);
     const strategy = CampaignStrategyBuilder.buildStrategy('t1', 'c1', obj, bb, conv);
-    
+
     expect(strategy.strategyEvidenceScore).toBe(45);
   });
 
@@ -88,10 +88,10 @@ describe('CampaignStrategyBuilder', () => {
     const obj = getMockObjective(); // campaignObjective(30) + primaryAudience(30)
     const bb = getMockBrandBrain(); // coreMessage(30)
     // Total should be 30 + 30 + 12 = 72
-    
+
     const conv = getMockConversation([]);
     const strategy = CampaignStrategyBuilder.buildStrategy('t1', 'c1', obj, bb, conv);
-    
+
     expect(strategy.readinessScore).toBe(72);
     expect(strategy.strategyReadinessReason).toContain('revisar');
   });
@@ -99,13 +99,13 @@ describe('CampaignStrategyBuilder', () => {
   it('generates strategyRisks and knowledgeGaps when information is missing', () => {
     const conv = getMockConversation([]); // no channels
     const strategy = CampaignStrategyBuilder.buildStrategy('t1', 'c1', getMockObjective(), getMockBrandBrain(), conv);
-    
+
     const channelRisk = strategy.strategyRisks.find(r => r.type === 'execution' && r.description.includes('canales'));
     expect(channelRisk).toBeDefined();
-    
+
     const channelGap = strategy.knowledgeGaps.find(g => g.field === 'recommendedChannels');
     expect(channelGap).toBeDefined();
-    
+
     const ctaGap = strategy.knowledgeGaps.find(g => g.field === 'callsToAction');
     expect(ctaGap).toBeDefined();
   });
@@ -146,7 +146,7 @@ describe('CampaignStrategyBuilder', () => {
 
   it('verifies that strategyRisks is independent of assumptions and knowledgeGaps', () => {
     const strategy = CampaignStrategyBuilder.buildStrategy('t1', 'c1', getMockObjective(), getMockBrandBrain(), null);
-    
+
     // We expect some risks, assumptions, and gaps to populate separately
     expect(strategy.strategyRisks.length).toBeGreaterThan(0);
     expect(strategy.assumptions.length).toBeGreaterThan(0);

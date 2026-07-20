@@ -1,9 +1,9 @@
 import type { GrowthObjective } from '../types/growthObjective';
 import type { BrandBrain } from '../types/brandBrain';
 import type { GrowthConversation, GrowthConversationTurn } from '../types/growthConversation';
-import type { 
-  CampaignStrategy, 
-  CampaignStrategyField, 
+import type {
+  CampaignStrategy,
+  CampaignStrategyField,
   CampaignStrategyFieldStatus
 } from '../types/campaignStrategy';
 
@@ -56,9 +56,9 @@ export class CampaignStrategyBuilder {
   private static buildObjectiveField(objective: GrowthObjective | null): CampaignStrategyField<string> {
     if (objective?.goal && objective?.productOrService) {
       return this.buildField(
-        'campaignObjective', 
-        `${objective.goal} ${objective.productOrService}`, 
-        'confirmed', 
+        'campaignObjective',
+        `${objective.goal} ${objective.productOrService}`,
+        'confirmed',
         'Growth Objective',
         `Goal: ${objective.goal}, Product: ${objective.productOrService}`
       );
@@ -95,7 +95,7 @@ export class CampaignStrategyBuilder {
     // Let's check conversation for explicit channel mentions.
     const explicitChannels: string[] = [];
     let evidence = '';
-    
+
     if (conversation) {
       const turns = (conversation as unknown as Record<string, unknown>).turns as GrowthConversationTurn[] | undefined;
       if (turns) {
@@ -213,7 +213,7 @@ export class CampaignStrategyBuilder {
         impact: 'medium'
       });
     }
-    
+
     if (strategy.primaryAudience.status === 'inferred') {
       strategy.assumptions.push({
         field: 'primaryAudience',

@@ -27,7 +27,7 @@ export class GrowthObjectiveMockService {
   ): Promise<GrowthObjective> {
     // We use conversationId to consistently find the existing objective if it exists
     let existingObj: GrowthObjective | undefined;
-    
+
     // Find if we already have an objective for this conversation
     for (const obj of objectives.values()) {
       if (obj.id.includes(conversationId)) {
@@ -37,7 +37,7 @@ export class GrowthObjectiveMockService {
     }
 
     const built = GrowthObjectiveBuilder.buildFromContext(context, isConfirmed, existingObj);
-    
+
     // If we didn't have one, we make sure its ID includes the conversationId for easy lookup in this mock
     let finalBuilt = built;
     if (!existingObj) {

@@ -67,7 +67,7 @@ export class GrowthConversationMockService implements IGrowthConversationService
     };
 
     conversations.set(conversation.id, conversation);
-    
+
     // Initial welcome turn
     const welcomeTurn = createTurn(
       conversation.id,
@@ -96,7 +96,7 @@ export class GrowthConversationMockService implements IGrowthConversationService
 
     const turns = conversationTurns.get(params.conversationId) || [];
     const newTurnNumber = turns.length + 1;
-    
+
     const userTurn = createTurn(params.conversationId, params.role, params.content, newTurnNumber);
     turns.push(userTurn);
     conversationTurns.set(params.conversationId, turns);
@@ -111,31 +111,31 @@ export class GrowthConversationMockService implements IGrowthConversationService
   ): Promise<GrowthConversation> {
     const conv = conversations.get(conversationId);
     if (!conv) throw new Error('Conversation not found');
-    
+
     conv.currentStage = nextStage;
     conv.updatedAt = new Date().toISOString();
-    
+
     return { ...conv };
   }
 
   async completeConversation(conversationId: string): Promise<GrowthConversation> {
     const conv = conversations.get(conversationId);
     if (!conv) throw new Error('Conversation not found');
-    
+
     conv.status = 'completed';
     conv.currentStage = 'completed';
     conv.updatedAt = new Date().toISOString();
-    
+
     return { ...conv };
   }
 
   async abandonConversation(conversationId: string): Promise<GrowthConversation> {
     const conv = conversations.get(conversationId);
     if (!conv) throw new Error('Conversation not found');
-    
+
     conv.status = 'abandoned';
     conv.updatedAt = new Date().toISOString();
-    
+
     return { ...conv };
   }
 
@@ -153,7 +153,7 @@ export class GrowthConversationMockService implements IGrowthConversationService
 
     const turns = conversationTurns.get(conversationId) || [];
     const lastUserTurn = [...turns].reverse().find(t => t.role === 'user');
-    
+
     let content: string;
     let nextStage = conv.currentStage;
 

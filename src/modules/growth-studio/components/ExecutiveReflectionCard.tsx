@@ -18,7 +18,7 @@ export const ExecutiveReflectionCard: React.FC<ExecutiveReflectionCardProps> = (
         </div>
         <h3 className="text-lg font-semibold text-white tracking-wide">Reflexión Estratégica</h3>
       </div>
-      
+
       <div className="space-y-4">
         {context.objective && (
           <div>
@@ -26,7 +26,7 @@ export const ExecutiveReflectionCard: React.FC<ExecutiveReflectionCardProps> = (
             <p className="text-emerald-50 text-sm">{context.objective}</p>
           </div>
         )}
-        
+
         {context.audience && (
           <div>
             <p className="text-xs font-medium uppercase tracking-widest text-emerald-400/70 mb-1">Audiencia</p>

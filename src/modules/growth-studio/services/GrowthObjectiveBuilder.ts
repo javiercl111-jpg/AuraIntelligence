@@ -9,7 +9,7 @@ import { GrowthObjectiveValidator } from './GrowthObjectiveValidator';
 export class GrowthObjectiveBuilder {
   /**
    * Builds or rebuilds a GrowthObjective from the conversation context.
-   * 
+   *
    * Weights:
    * Critical (4 fields): 20% each = 80%
    * Recommended (2 fields): 10% each = 20%
@@ -21,7 +21,7 @@ export class GrowthObjectiveBuilder {
     existingObjective?: GrowthObjective
   ): GrowthObjective {
     const now = new Date().toISOString();
-    
+
     // Map context fields to objective fields
     const goal = context.objective || '';
     const productOrService = context.productOrService || '';
@@ -30,7 +30,7 @@ export class GrowthObjectiveBuilder {
     const region = context.region || '';
     const budget = context.budget || '';
     const constraints = context.constraints || [];
-    
+
     // Using default horizon if missing
     // We don't have horizon in context mapping currently, so it might be empty
     const horizon = existingObjective?.horizon || 'medium_term';
@@ -44,13 +44,13 @@ export class GrowthObjectiveBuilder {
 
     // Helper to process fields
     const processField = (
-      fieldName: string, 
-      value: unknown, 
-      weight: number, 
+      fieldName: string,
+      value: unknown,
+      weight: number,
       isOptional: boolean = false
     ) => {
       const hasValue = Array.isArray(value) ? value.length > 0 : !!(value && typeof value === 'string' && value.trim() !== '');
-      
+
       if (!hasValue) {
         missingFields.push(fieldName);
       } else {

@@ -31,10 +31,10 @@ export const NextRecommendedActionCard: React.FC<NextRecommendedActionCardProps>
           Siguiente Acción Recomendada
         </span>
       </div>
-      
+
       <h3 className="text-xl font-bold text-white mb-2">{action.title}</h3>
       <p className="text-sm text-white/70 mb-4 capitalize">Fase: {action.phase.replace('_', ' ')}</p>
-      
+
       <button className={`w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold text-white transition ${isCritical ? 'bg-red-600 hover:bg-red-500' : 'bg-blue-600 hover:bg-blue-500'}`}>
         Ejecutar <ArrowRight size={16} />
       </button>
