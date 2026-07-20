@@ -13,6 +13,8 @@ import AuraIntelligenceConsolePage from './pages/AuraIntelligenceConsolePage';
 
 import type { AuraIntelligenceContext } from './types/auraIntelligence';
 import { seedDefaultArticles } from './services/auraKnowledgeAdminService';
+import { isFeatureEnabled } from './services/featureFlagService';
+import { GrowthStudioEntry } from './modules/growth-studio';
 
 const buildDemoContext = (userEmail?: string | null): AuraIntelligenceContext => ({
   tenantId: 'aura_demo',
@@ -158,6 +160,12 @@ const App: React.FC = () => {
         <ConversationsAuditPage />
         <KnowledgeCenterPage />
       </section>
+
+      {isFeatureEnabled('growth_studio.enabled') && (
+        <section className="mx-auto max-w-6xl px-6 pb-8">
+          <GrowthStudioEntry />
+        </section>
+      )}
 
       <AuraAssistantWidget context={context} />
     </main>
