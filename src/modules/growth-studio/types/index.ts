@@ -86,4 +86,15 @@ export type {
   ExecutiveExecutionPlan,
 } from './executiveExecutionPlan';
 
+// Content Plan
+export type {
+  ContentAssetPhase,
+  ContentAssetPriority,
+  ContentAsset,
+  AssetDependencyGraph,
+  ProductionInput,
+  ContentRisk,
+  ContentPlan
+} from './contentPlan';
+
 export default {};

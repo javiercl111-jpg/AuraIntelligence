@@ -6,6 +6,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useGrowthConversation } from '../hooks/useGrowthConversation';
 import ConversationBubble from './ConversationBubble';
 import TypingIndicator from './TypingIndicator';
+import { ContentPlanSummary } from './ContentPlanSummary';
 import ExecutiveReflectionCard from './ExecutiveReflectionCard';
 import ExecutiveProposalCard from './ExecutiveProposalCard';
 import GrowthObjectiveSummary from './GrowthObjectiveSummary';
@@ -18,7 +19,7 @@ interface ExecutiveConversationPageProps {
 }
 
 export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps> = ({ onClose }) => {
-  const { conversation, turns, objective, brandBrain, campaignStrategy, executionPlan, isTyping, error, start, addTurn } = useGrowthConversation();
+  const { conversation, turns, objective, brandBrain, campaignStrategy, executionPlan, contentPlan, isTyping, error, start, addTurn } = useGrowthConversation();
   const [inputValue, setInputValue] = useState('');
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
@@ -94,13 +95,14 @@ export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps>
                   {brandBrain && <BrandBrainSummary brain={brandBrain} />}
                   {campaignStrategy && <CampaignStrategySummary strategy={campaignStrategy} />}
                   {executionPlan && <ExecutiveExecutionPlanSummary plan={executionPlan} />}
+                  {contentPlan && <ContentPlanSummary plan={contentPlan} />}
                   <ExecutiveReflectionCard context={conversation.structuredContext} />
                 </div>
               )}
               
               {/* Inject Proposal Card after assistant introduces it */}
               {isLastTurn && turn.role === 'assistant' && (conversation.currentStage === 'executive_proposal' || conversation.currentStage === 'completed') && (
-                <ExecutiveProposalCard context={conversation.structuredContext} plan={executionPlan} />
+                <ExecutiveProposalCard context={conversation.structuredContext} plan={executionPlan} contentPlan={contentPlan} />
               )}
             </React.Fragment>
           );

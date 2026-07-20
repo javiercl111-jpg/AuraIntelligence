@@ -5,14 +5,16 @@
 import React from 'react';
 import type { GrowthStructuredContext } from '../types/growthConversation';
 import type { ExecutiveExecutionPlan } from '../types/executiveExecutionPlan';
-import { PlayCircle, AlertTriangle, ShieldCheck, ShieldAlert } from 'lucide-react';
+import type { ContentPlan } from '../types/contentPlan';
+import { PlayCircle, AlertTriangle, ShieldCheck, ShieldAlert, FileText } from 'lucide-react';
 
 interface ExecutiveProposalCardProps {
   context: GrowthStructuredContext;
   plan?: ExecutiveExecutionPlan | null;
+  contentPlan?: ContentPlan | null;
 }
 
-export const ExecutiveProposalCard: React.FC<ExecutiveProposalCardProps> = ({ context, plan }) => {
+export const ExecutiveProposalCard: React.FC<ExecutiveProposalCardProps> = ({ context, plan, contentPlan }) => {
   return (
     <div className="w-full max-w-2xl mx-auto my-6 p-8 rounded-2xl border border-emerald-400/40 bg-gradient-to-br from-emerald-950/60 to-black shadow-2xl shadow-emerald-900/20">
       <div className="text-center mb-6">
@@ -72,6 +74,25 @@ export const ExecutiveProposalCard: React.FC<ExecutiveProposalCardProps> = ({ co
               </p>
             </div>
           </>
+        )}
+
+        {contentPlan && contentPlan.contentAssets.length > 0 && (
+          <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-400/30">
+            <h4 className="text-sm font-semibold text-emerald-300 mb-2 flex items-center gap-2">
+              <FileText size={16} /> Plan de Producción
+            </h4>
+            <p className="text-sm text-emerald-50/90 font-medium mb-3">
+              Estos son los activos que debemos producir primero:
+            </p>
+            <ul className="space-y-2">
+              {contentPlan.contentAssets.map(asset => (
+                <li key={asset.id} className="text-xs text-emerald-50/80 p-2 rounded bg-white/5 border border-white/5 flex justify-between items-center">
+                  <span><strong>{asset.title}</strong></span>
+                  <span className="text-[10px] text-emerald-200/50 uppercase tracking-wider">{asset.priority}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
     </div>

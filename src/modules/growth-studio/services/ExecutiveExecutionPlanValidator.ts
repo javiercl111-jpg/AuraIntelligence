@@ -89,7 +89,7 @@ export function calculateExecutionReadiness(plan: ExecutiveExecutionPlan): Readi
   }
 
   // Generate reason
-  let reason = '';
+  let reason: string;
   if (isBlocked) {
     if (hasBlocker) {
       reason = 'La ejecución está bloqueada por dependencias críticas no resueltas.';
