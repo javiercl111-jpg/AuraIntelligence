@@ -144,7 +144,7 @@ describe('App — Integration Smoke Tests', () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText('Aura Growth Studio™')).toBeInTheDocument();
+      expect(screen.getByText('Executive Snapshot')).toBeInTheDocument();
     });
   });
 });
