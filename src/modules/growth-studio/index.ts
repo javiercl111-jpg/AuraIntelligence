@@ -4,6 +4,7 @@
 
 // Component
 export { default as GrowthStudioEntry } from './components/GrowthStudioEntry';
+export { default as ExecutiveConversationPage } from './components/ExecutiveConversationPage';
 
 // Module Definition
 export { GrowthStudioModuleDefinition } from './config/growthStudioModule';
