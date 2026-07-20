@@ -25,17 +25,18 @@ describe('GrowthConversationMockService', () => {
     expect(turns[0].role).toBe('assistant');
   });
 
-  it('progresses through the full state machine', async () => {
+  it('progresses through the full state machine via happy path', async () => {
     const conv = await growthConversationService.startConversation({
       tenantId: 'test', companyId: 'test', userId: 'test'
     });
 
-    // 1. Send Objective -> expect Audience question
-    await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'My objective' });
+    // 1. Send Objective with Product -> expect Audience question (skipping product question)
+    await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'Quiero vender Aura HCM' });
     await growthConversationService.generateAssistantResponse(conv.id);
     let updatedConv = await growthConversationService.getConversation(conv.id);
     expect(updatedConv?.currentStage).toBe('understanding_audience');
-    expect(updatedConv?.structuredContext.objective).toBe('My objective');
+    expect(updatedConv?.structuredContext.objective).toBe('vender/comercializar');
+    expect(updatedConv?.structuredContext.productOrService).toBe('Aura HCM');
 
     // 2. Send Audience -> expect Region question
     await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'My audience' });
@@ -55,24 +56,62 @@ describe('GrowthConversationMockService', () => {
     updatedConv = await growthConversationService.getConversation(conv.id);
     expect(updatedConv?.currentStage).toBe('executive_reflection');
 
-    // 5. Send Correction (Not saying 'sí') -> expect to stay in reflection
-    await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'No, quiero cambiar algo' });
-    await growthConversationService.generateAssistantResponse(conv.id);
-    updatedConv = await growthConversationService.getConversation(conv.id);
-    expect(updatedConv?.currentStage).toBe('executive_reflection');
-
-    // 6. Send Confirmation -> expect Proposal
+    // 5. Send Confirmation directly -> expect Proposal
     await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'Sí, es correcto' });
     await growthConversationService.generateAssistantResponse(conv.id);
     updatedConv = await growthConversationService.getConversation(conv.id);
     expect(updatedConv?.currentStage).toBe('executive_proposal');
 
-    // 7. Send Final Approval -> expect Completed
+    // 6. Send Final Approval -> expect Completed
     await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'Aprobar' });
     await growthConversationService.generateAssistantResponse(conv.id);
     updatedConv = await growthConversationService.getConversation(conv.id);
     expect(updatedConv?.currentStage).toBe('completed');
     expect(updatedConv?.status).toBe('completed');
+  });
+
+  it('asks for product if not identified in objective', async () => {
+    const conv = await growthConversationService.startConversation({
+      tenantId: 'test', companyId: 'test', userId: 'test'
+    });
+
+    // 1. Send Objective without Product -> expect Product question
+    await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'Quiero crecer este año' });
+    await growthConversationService.generateAssistantResponse(conv.id);
+    let updatedConv = await growthConversationService.getConversation(conv.id);
+    expect(updatedConv?.currentStage).toBe('understanding_product');
+
+    // 2. Send Product -> expect Audience question
+    await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'Aura HCM' });
+    await growthConversationService.generateAssistantResponse(conv.id);
+    updatedConv = await growthConversationService.getConversation(conv.id);
+    expect(updatedConv?.currentStage).toBe('understanding_audience');
+    expect(updatedConv?.structuredContext.productOrService).toBe('Aura HCM');
+  });
+
+  it('handles correction flow in executive_reflection', async () => {
+    const conv = await growthConversationService.startConversation({
+      tenantId: 'test', companyId: 'test', userId: 'test'
+    });
+
+    // Fast-forward to reflection
+    await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'Quiero vender Aura HCM' });
+    await growthConversationService.generateAssistantResponse(conv.id);
+    await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'My audience' });
+    await growthConversationService.generateAssistantResponse(conv.id);
+    await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'My region' });
+    await growthConversationService.generateAssistantResponse(conv.id);
+    await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'My result' });
+    await growthConversationService.generateAssistantResponse(conv.id);
+    let updatedConv = await growthConversationService.getConversation(conv.id);
+    expect(updatedConv?.currentStage).toBe('executive_reflection');
+
+    // User corrects audience
+    await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'cambiar audiencia a Pymes' });
+    await growthConversationService.generateAssistantResponse(conv.id);
+    updatedConv = await growthConversationService.getConversation(conv.id);
+    expect(updatedConv?.currentStage).toBe('executive_reflection');
+    expect(updatedConv?.structuredContext.audience).toBe('cambiar audiencia a Pymes');
   });
 
   it('rejects empty input', async () => {

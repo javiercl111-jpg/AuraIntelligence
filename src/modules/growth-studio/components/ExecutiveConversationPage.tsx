@@ -8,13 +8,14 @@ import ConversationBubble from './ConversationBubble';
 import TypingIndicator from './TypingIndicator';
 import ExecutiveReflectionCard from './ExecutiveReflectionCard';
 import ExecutiveProposalCard from './ExecutiveProposalCard';
+import GrowthObjectiveSummary from './GrowthObjectiveSummary';
 
 interface ExecutiveConversationPageProps {
   onClose: () => void;
 }
 
 export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps> = ({ onClose }) => {
-  const { conversation, turns, isTyping, error, start, addTurn } = useGrowthConversation();
+  const { conversation, turns, objective, isTyping, error, start, addTurn } = useGrowthConversation();
   const [inputValue, setInputValue] = useState('');
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
@@ -26,7 +27,7 @@ export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps>
     if (endOfMessagesRef.current?.scrollIntoView) {
       endOfMessagesRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [turns, isTyping]);
+  }, [turns, isTyping, objective]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,19 +78,18 @@ export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps>
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
         {turns.map((turn, index) => {
-          // If the next state is reflection/proposal, and this is the last assistant message before it,
-          // or we just want to render the cards at specific stages.
-          // In our mock, the cards are rendered if the conversation has reached that stage,
-          // usually at the bottom, or inline after the assistant's turn.
           const isLastTurn = index === turns.length - 1;
           
           return (
             <React.Fragment key={turn.id}>
               <ConversationBubble content={turn.content} role={turn.role} />
               
-              {/* Inject Reflection Card after assistant introduces it */}
-              {isLastTurn && turn.role === 'assistant' && conversation.currentStage === 'executive_reflection' && (
-                <ExecutiveReflectionCard context={conversation.structuredContext} />
+              {/* Inject Objective Summary before Reflection Card */}
+              {isLastTurn && turn.role === 'assistant' && conversation.currentStage === 'executive_reflection' && objective && (
+                <div className="mb-4">
+                  <GrowthObjectiveSummary objective={objective} />
+                  <ExecutiveReflectionCard context={conversation.structuredContext} />
+                </div>
               )}
               
               {/* Inject Proposal Card after assistant introduces it */}

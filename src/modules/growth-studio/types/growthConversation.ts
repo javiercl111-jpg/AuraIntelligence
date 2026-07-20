@@ -21,6 +21,7 @@ export type GrowthConversationStatus =
 export type GrowthConversationStage =
   | 'welcome'
   | 'understanding_objective'
+  | 'understanding_product'
   | 'understanding_audience'
   | 'understanding_region'
   | 'understanding_result'
@@ -50,6 +51,9 @@ export interface GrowthStructuredContext {
 
   /** Extracted expected result. */
   expectedResult?: string;
+
+  /** Extracted budget or financial constraints. */
+  budget?: string;
 
   /** Extracted constraints. */
   constraints?: string[];

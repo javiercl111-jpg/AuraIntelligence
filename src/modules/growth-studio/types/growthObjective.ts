@@ -17,6 +17,11 @@ export type GrowthObjectiveStatus =
   | 'archived';
 
 /**
+ * Status of a specific field within the objective.
+ */
+export type GrowthObjectiveFieldStatus = 'confirmed' | 'inferred' | 'missing';
+
+/**
  * Time horizon for the growth objective.
  */
 export type GrowthHorizon =
@@ -73,11 +78,29 @@ export interface GrowthObjective {
   /** Expected measurable result. */
   expectedResult: string;
 
+  /** Estimated budget if any. */
+  budget?: string;
+
   /** Known constraints or limitations. */
   constraints: string[];
 
   /** AI or executive confidence in this objective. */
   confidence: ConfidenceLevel;
+
+  /** Completeness percentage (0-100). */
+  completionPercentage?: number;
+
+  /** List of field names that are missing. */
+  missingFields?: string[];
+
+  /** List of field names that are confirmed by the user. */
+  confirmedFields?: string[];
+
+  /** List of field names that are inferred by AI. */
+  inferredFields?: string[];
+
+  /** List of critical validation errors. */
+  validationErrors?: string[];
 
   /** Schema version for forward compatibility. */
   readonly schemaVersion: number;

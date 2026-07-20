@@ -5,6 +5,12 @@
 // Component
 export { default as GrowthStudioEntry } from './components/GrowthStudioEntry';
 export { default as ExecutiveConversationPage } from './components/ExecutiveConversationPage';
+export { default as GrowthObjectiveSummary } from './components/GrowthObjectiveSummary';
+export { default as GrowthObjectiveCard } from './components/GrowthObjectiveCard';
+export { default as CompletionIndicator } from './components/CompletionIndicator';
+export { default as MissingInformationBadge } from './components/MissingInformationBadge';
+export * from './types/growthConversation';
+export * from './types/growthObjective';
 
 // Module Definition
 export { GrowthStudioModuleDefinition } from './config/growthStudioModule';

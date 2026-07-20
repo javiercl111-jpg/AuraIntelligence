@@ -12,6 +12,7 @@ import type {
   GrowthConversationTurn,
   GrowthConversationStage,
 } from '../types/growthConversation';
+import { GrowthObjectiveValidator } from './GrowthObjectiveValidator';
 
 /**
  * Global delay for the mock service to simulate AI thinking time.
@@ -158,8 +159,32 @@ export class GrowthConversationMockService implements IGrowthConversationService
 
     // State machine logic
     switch (conv.currentStage) {
-      case 'understanding_objective':
-        conv.structuredContext.objective = lastUserTurn?.content;
+      case 'understanding_objective': {
+        const userInput = lastUserTurn?.content || '';
+        const lowerInput = userInput.toLowerCase();
+        if (lowerInput.includes('vender') || lowerInput.includes('comercializar')) {
+          const productMatch = lowerInput.match(/(?:vender|comercializar)\s+(.+)/i);
+          if (productMatch && productMatch[1]) {
+            conv.structuredContext.objective = 'vender/comercializar';
+            conv.structuredContext.productOrService = userInput.substring(productMatch.index! + productMatch[0].length - productMatch[1].length).trim();
+          } else {
+            conv.structuredContext.objective = userInput;
+          }
+        } else {
+          conv.structuredContext.objective = userInput;
+        }
+
+        if (!conv.structuredContext.productOrService) {
+          content = '¿Qué producto o servicio deseas impulsar?';
+          nextStage = 'understanding_product';
+        } else {
+          content = 'Entendido. ¿Cuál es la audiencia objetivo a la que nos dirigimos?';
+          nextStage = 'understanding_audience';
+        }
+        break;
+      }
+      case 'understanding_product':
+        conv.structuredContext.productOrService = lastUserTurn?.content;
         content = 'Entendido. ¿Cuál es la audiencia objetivo a la que nos dirigimos?';
         nextStage = 'understanding_audience';
         break;
@@ -179,14 +204,41 @@ export class GrowthConversationMockService implements IGrowthConversationService
         nextStage = 'executive_reflection';
         break;
       case 'executive_reflection': {
-        // Rule: After executive_reflection, ask for confirmation
         const userMsg = lastUserTurn?.content.toLowerCase() || '';
+        // Confirmation
         if (userMsg.includes('sí') || userMsg.includes('correcto') || userMsg.includes('si')) {
-          content = '¡Excelente! Generando la propuesta preliminar...';
-          nextStage = 'executive_proposal';
+          // Re-validate current context before allowing progress
+          const validationErrors = GrowthObjectiveValidator.validate({
+            goal: conv.structuredContext.objective,
+            productOrService: conv.structuredContext.productOrService,
+            audience: conv.structuredContext.audience,
+            expectedResult: conv.structuredContext.expectedResult
+          });
+
+          if (validationErrors.length > 0) {
+            content = `Aún faltan datos críticos para completar el objetivo: ${validationErrors.join(', ')}. Por favor, indícame estos datos.`;
+          } else {
+            content = '¡Excelente! He confirmado tus datos. Generando la propuesta preliminar...';
+            nextStage = 'executive_proposal';
+          }
         } else {
-          content = 'De acuerdo, por favor indícame qué parte deseas corregir (objetivo, audiencia, región o resultado).';
-          // Stay in executive_reflection stage for correction loop
+          // Correction logic
+          if (userMsg.includes('objetivo') || userMsg.includes('meta')) {
+            conv.structuredContext.objective = lastUserTurn?.content; // simplistic mock capture
+            content = 'He actualizado el objetivo. ¿La información actual es correcta o deseas corregir algo más?';
+          } else if (userMsg.includes('audiencia')) {
+            conv.structuredContext.audience = lastUserTurn?.content;
+            content = 'He actualizado la audiencia. ¿La información actual es correcta o deseas corregir algo más?';
+          } else if (userMsg.includes('región') || userMsg.includes('region')) {
+            conv.structuredContext.region = lastUserTurn?.content;
+            content = 'He actualizado la región. ¿La información actual es correcta o deseas corregir algo más?';
+          } else if (userMsg.includes('resultado')) {
+            conv.structuredContext.expectedResult = lastUserTurn?.content;
+            content = 'He actualizado el resultado esperado. ¿La información actual es correcta o deseas corregir algo más?';
+          } else {
+            content = 'De acuerdo, indícame qué campo deseas corregir mencionando su nombre (ej. "Mi nuevo objetivo es...", "La audiencia será...").';
+          }
+          // Stay in executive_reflection to allow more corrections or confirmation
         }
         break;
       }
