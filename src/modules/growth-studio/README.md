@@ -161,3 +161,7 @@ VITE_FEATURE_GROWTH_STUDIO=true
 | **Growth-03** | Brand Brain (Minimal) |
 | **Growth-04** | Campaign Draft Generation |
 | **Growth-05** | Approval Flow |
+| **Growth-06** | Executive Artifact |
+| **Growth-07** | Executive Content Brief™ |
+| **Growth-08A** | Executive Generation Engine™ |
+| **Growth-08B** | Executive Review Engine™ (Evidence-based Review, Separation of Evaluation, automated review distinct from human approval, next phase without real provider yet) |

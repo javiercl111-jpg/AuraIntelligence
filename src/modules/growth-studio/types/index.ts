@@ -115,4 +115,44 @@ export type {
   ExecutiveContentBrief
 } from './executiveContentBrief';
 
+export type {
+  GenerationPolicyLevel,
+  GenerationPolicy,
+} from './generationPolicy';
+export { STRICT_POLICY, CREATIVE_POLICY } from './generationPolicy';
+
+export type {
+  ProviderCapability,
+  GenerationIntent,
+  GenerationContentSection,
+  ExecutiveGenerationRequest
+} from './executiveGenerationRequest';
+
+export type {
+  ProviderMessage,
+  ProviderInstruction
+} from './providerInstruction';
+
+export type {
+  GenerationTrace
+} from './generationTrace';
+
+export type {
+  GenerationDraftStatus,
+  ValidationViolation,
+  ValidationReport,
+  GeneratedContentDraft
+} from './generatedContentDraft';
+
+export type {
+  ReviewStatus,
+  ReviewSeverity,
+  ReviewFindingType,
+  ReviewEvidence,
+  ReviewFinding,
+  ReviewRecommendation,
+  ReviewCategoryScore,
+  ExecutiveReviewReport
+} from './executiveReviewReport';
+
 export default {};
