@@ -1,0 +1,12 @@
+export const ExecutiveArtifactType = {
+  GROWTH_OBJECTIVE: 'GROWTH_OBJECTIVE',
+  BRAND_BRAIN: 'BRAND_BRAIN',
+  CAMPAIGN_STRATEGY: 'CAMPAIGN_STRATEGY',
+  EXECUTION_PLAN: 'EXECUTION_PLAN',
+  CONTENT_PLAN: 'CONTENT_PLAN',
+  EXECUTIVE_CONTENT_BRIEF: 'EXECUTIVE_CONTENT_BRIEF',
+  GENERATED_DRAFT: 'GENERATED_DRAFT',
+  EXECUTIVE_REVIEW: 'EXECUTIVE_REVIEW',
+} as const;
+
+export type ExecutiveArtifactType = (typeof ExecutiveArtifactType)[keyof typeof ExecutiveArtifactType];
