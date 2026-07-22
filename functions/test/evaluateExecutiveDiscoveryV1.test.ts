@@ -1,6 +1,6 @@
 import type { Response } from 'express';
 import type { Request } from 'firebase-functions/v2/https';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type {
   ExecutiveDiagnosis,
   ExecutiveDiscoveryRequest,
@@ -13,12 +13,74 @@ import {
   ExecutiveDiscoveryCapability,
 } from '../../src/core/eis/discovery';
 import { createEvaluateExecutiveDiscoveryV1Handler } from '../src/evaluateExecutiveDiscoveryV1';
+import type { ExecutiveDiscoverySecurityConfig } from '../src/config';
 import {
   ExecutiveDiscoveryApiErrorCode,
   ExecutiveDiscoveryHttpStatus,
 } from '../src/httpEnvelopes';
+import {
+  SecurityLogOutcome,
+  type SecurityLogger,
+} from '../src/observability';
+import {
+  SecurityEnvironment,
+  ServiceAuthenticationMethod,
+  ServiceAuthorizationPolicy,
+  ServiceIdentityVerificationErrorCode,
+  identityVerificationFailure,
+  type SecurityClock,
+  type ServiceIdentity,
+  type ServiceIdentityVerifier,
+} from '../src/security';
 
 const FIXED_TIME = '2026-07-21T18:00:00.000Z';
+const TEST_TOKEN = 'test-service-token-value';
+
+const securityClock: SecurityClock = { nowEpochSeconds: () => 1_000 };
+
+const securityConfig: ExecutiveDiscoverySecurityConfig = {
+  environment: SecurityEnvironment.TEST,
+  allowedIssuers: ['https://issuer.example.test'],
+  allowedAudiences: ['aura-intelligence'],
+  allowedSubjects: ['control-center-backend'],
+  subjectTenantGrants: { 'control-center-backend': ['tenant-001'] },
+  subjectOrganizationGrants: {
+    'control-center-backend': ['organization-001'],
+  },
+  subjectCompanyGrants: { 'control-center-backend': ['company-001'] },
+  allowDevelopmentVerifier: true,
+  clockSkewSeconds: 30,
+  tokenMaxAgeSeconds: 300,
+  claimsVersion: '1',
+  authorizationHeaderRequired: true,
+  oidcAlgorithms: [],
+  developmentCredentials: [
+    { token: TEST_TOKEN, subject: 'control-center-backend' },
+  ],
+};
+
+const serviceIdentity: ServiceIdentity = {
+  subject: 'control-center-backend',
+  issuer: 'https://issuer.example.test',
+  audience: ['aura-intelligence'],
+  authenticationMethod: ServiceAuthenticationMethod.TEST,
+  environment: SecurityEnvironment.TEST,
+  authorizedTenantIds: ['tenant-001'],
+  authorizedOrganizationIds: ['organization-001'],
+  authorizedCompanyIds: ['company-001'],
+  claimsVersion: '1',
+};
+
+const identityVerifier: ServiceIdentityVerifier = {
+  verify: async (token) =>
+    token === TEST_TOKEN
+      ? { success: true, identity: serviceIdentity }
+      : identityVerificationFailure(
+          ServiceIdentityVerificationErrorCode.INVALID_TOKEN,
+        ),
+};
+
+const noOpSecurityLogger: SecurityLogger = { log: () => undefined };
 
 function createValidRequest(): ExecutiveDiscoveryRequest {
   return {
@@ -122,18 +184,39 @@ function createHttpRequest(
   return {
     method: 'POST',
     body,
-    get: (header: string) =>
-      header.toLowerCase() === 'content-type' ? contentType : undefined,
+    get: createHeaderGetter(contentType, `Bearer ${TEST_TOKEN}`),
     ...overrides,
   } as Request;
+}
+
+function createHeaderGetter(
+  contentType: string,
+  authorization?: string,
+): Request['get'] {
+  return ((header: string) => {
+    if (header.toLowerCase() === 'content-type') return contentType;
+    if (header.toLowerCase() === 'authorization') return authorization;
+    return undefined;
+  }) as Request['get'];
 }
 
 async function executeRequest(
   capability: Pick<ExecutiveDiscoveryCapability, 'execute'>,
   request: Request,
+  overrides: Partial<{
+    identityVerifier: ServiceIdentityVerifier;
+    securityLogger: SecurityLogger;
+  }> = {},
 ): Promise<CapturedResponse> {
   const { response, captured } = createResponse();
-  await createEvaluateExecutiveDiscoveryV1Handler(capability)(request, response);
+  await createEvaluateExecutiveDiscoveryV1Handler({
+    capability,
+    identityVerifier: overrides.identityVerifier ?? identityVerifier,
+    authorizationPolicy: new ServiceAuthorizationPolicy(securityConfig),
+    securityConfig,
+    securityLogger: overrides.securityLogger ?? noOpSecurityLogger,
+    clock: securityClock,
+  })(request, response);
   return captured();
 }
 
@@ -247,5 +330,84 @@ describe('evaluateExecutiveDiscoveryV1 transport', () => {
       error: { code: ExecutiveDiscoveryApiErrorCode.EXECUTIVE_DISCOVERY_FAILED },
       correlationId: 'correlation-001',
     });
+  });
+
+  it('returns 401 when Authorization is missing', async () => {
+    const capability = { execute: vi.fn(createCapability().execute.bind(createCapability())) };
+    const response = await executeRequest(
+      capability,
+      createHttpRequest(createValidRequest(), {
+        get: createHeaderGetter('application/json'),
+      }),
+    );
+
+    expect(response.statusCode).toBe(ExecutiveDiscoveryHttpStatus.UNAUTHENTICATED);
+    expect(response.body).toEqual({
+      success: false,
+      error: {
+        code: ExecutiveDiscoveryApiErrorCode.AUTHENTICATION_REQUIRED,
+        message: 'Service authentication is required.',
+      },
+    });
+    expect(capability.execute).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 for an invalid token without leaking verifier details', async () => {
+    const response = await executeRequest(
+      createCapability(),
+      createHttpRequest(createValidRequest(), {
+        get: createHeaderGetter(
+          'application/json',
+          'Bearer private-invalid-token',
+        ),
+      }),
+    );
+
+    expect(response.statusCode).toBe(ExecutiveDiscoveryHttpStatus.UNAUTHENTICATED);
+    expect(JSON.stringify(response.body)).not.toContain('private-invalid-token');
+    expect(JSON.stringify(response.body)).not.toContain('INVALID_TOKEN');
+  });
+
+  it('returns 403 and does not invoke the capability for a manipulated tenant', async () => {
+    const capability = { execute: vi.fn(createCapability().execute.bind(createCapability())) };
+    const response = await executeRequest(
+      capability,
+      createHttpRequest({ ...createValidRequest(), tenantId: 'tenant-001-extra' }),
+    );
+
+    expect(response.statusCode).toBe(ExecutiveDiscoveryHttpStatus.FORBIDDEN);
+    expect(response.body).toEqual({
+      success: false,
+      error: {
+        code: ExecutiveDiscoveryApiErrorCode.ACCESS_FORBIDDEN,
+        message: 'The service is not authorized for this request.',
+      },
+    });
+    expect(capability.execute).not.toHaveBeenCalled();
+  });
+
+  it('logs only safe security metadata for an authorized request', async () => {
+    const log = vi.fn();
+    await executeRequest(
+      createCapability(),
+      createHttpRequest(createValidRequest()),
+      { securityLogger: { log } },
+    );
+
+    expect(log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        correlationId: 'correlation-001',
+        requestId: 'request-001',
+        callerSubject: 'control-center-backend',
+        tenantId: 'tenant-001',
+        organizationId: 'organization-001',
+        companyId: 'company-001',
+        outcome: SecurityLogOutcome.AUTHORIZED,
+      }),
+    );
+    const serialized = JSON.stringify(log.mock.calls);
+    expect(serialized).not.toContain(TEST_TOKEN);
+    expect(serialized).not.toContain('Subscription revenue');
+    expect(serialized).not.toContain('receipt-001');
   });
 });
