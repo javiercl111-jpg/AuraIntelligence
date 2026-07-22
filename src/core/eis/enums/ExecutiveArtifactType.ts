@@ -7,6 +7,7 @@ export const ExecutiveArtifactType = {
   EXECUTIVE_CONTENT_BRIEF: 'EXECUTIVE_CONTENT_BRIEF',
   GENERATED_DRAFT: 'GENERATED_DRAFT',
   EXECUTIVE_REVIEW: 'EXECUTIVE_REVIEW',
+  EXECUTIVE_DIAGNOSIS: 'EXECUTIVE_DIAGNOSIS',
 } as const;
 
 export type ExecutiveArtifactType = (typeof ExecutiveArtifactType)[keyof typeof ExecutiveArtifactType];
