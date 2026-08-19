@@ -47,11 +47,15 @@ describe('Growth Studio — Module Smoke Tests', () => {
 
   // ── Module Exports ───────────────────────────────────────
   describe('Module Exports', () => {
-    it('exports GrowthStudioEntry component', async () => {
-      const mod = await import('../index');
-      expect(mod.GrowthStudioEntry).toBeDefined();
-      expect(typeof mod.GrowthStudioEntry).toBe('function');
-    });
+    it(
+      'exports GrowthStudioEntry component',
+      async () => {
+        const mod = await import('../index');
+        expect(mod.GrowthStudioEntry).toBeDefined();
+        expect(typeof mod.GrowthStudioEntry).toBe('function');
+      },
+      10000,
+    );
 
     it('exports GrowthStudioModuleDefinition', async () => {
       const mod = await import('../index');

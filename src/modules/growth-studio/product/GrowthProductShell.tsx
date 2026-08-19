@@ -1,4 +1,7 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
+
+import GrowthLanguageSelector from '../i18n/GrowthLanguageSelector';
+import { useGrowthI18n } from '../i18n/GrowthI18nProvider';
 
 import {
   BarChart3,
@@ -40,8 +43,14 @@ export interface GrowthProductShellProps {
 
 interface NavigationItem {
   readonly id: GrowthProductSection;
-  readonly label: string;
-  readonly description: string;
+  readonly labelKey:
+    keyof ReturnType<
+      typeof useGrowthI18n
+    >['messages']['nav'];
+  readonly descriptionKey:
+    keyof ReturnType<
+      typeof useGrowthI18n
+    >['messages']['nav'];
   readonly icon: React.ComponentType<{
     size?: number;
     className?: string;
@@ -51,44 +60,44 @@ interface NavigationItem {
 const primaryNavigation: readonly NavigationItem[] = [
   {
     id: 'overview',
-    label: 'Overview',
-    description: 'Situación y prioridades',
+    labelKey: 'overview',
+    descriptionKey: 'overviewDescription',
     icon: LayoutDashboard,
   },
   {
     id: 'opportunities',
-    label: 'Opportunities',
-    description: 'Pipeline y potencial',
+    labelKey: 'opportunities',
+    descriptionKey: 'opportunitiesDescription',
     icon: Target,
   },
   {
     id: 'campaigns',
-    label: 'Campaigns',
-    description: 'Estrategia y ejecución',
+    labelKey: 'campaigns',
+    descriptionKey: 'campaignsDescription',
     icon: Megaphone,
   },
   {
     id: 'intelligence',
-    label: 'Intelligence',
-    description: 'Recomendaciones y evidencia',
+    labelKey: 'intelligence',
+    descriptionKey: 'intelligenceDescription',
     icon: BrainCircuit,
   },
   {
     id: 'content',
-    label: 'Content & Execution',
-    description: 'Contenido y activos',
+    labelKey: 'contentExecution',
+    descriptionKey: 'contentExecutionDescription',
     icon: FileStack,
   },
   {
     id: 'performance',
-    label: 'Performance',
-    description: 'KPIs y progreso',
+    labelKey: 'performance',
+    descriptionKey: 'performanceDescription',
     icon: BarChart3,
   },
   {
     id: 'advisor',
-    label: 'Growth Advisor',
-    description: 'Copiloto ejecutivo',
+    labelKey: 'advisor',
+    descriptionKey: 'advisorDescription',
     icon: Sparkles,
   },
 ] as const;
@@ -96,63 +105,23 @@ const primaryNavigation: readonly NavigationItem[] = [
 const secondaryNavigation: readonly NavigationItem[] = [
   {
     id: 'team',
-    label: 'Team & Users',
-    description: 'Equipo y responsabilidades',
+    labelKey: 'teamUsers',
+    descriptionKey: 'teamUsersDescription',
     icon: Users,
   },
   {
     id: 'notifications',
-    label: 'Notifications',
-    description: 'Alertas y actividad',
+    labelKey: 'notifications',
+    descriptionKey: 'notificationsDescription',
     icon: Bell,
   },
   {
     id: 'settings',
-    label: 'Settings',
-    description: 'Empresa, canales y permisos',
+    labelKey: 'settings',
+    descriptionKey: 'settingsDescription',
     icon: Settings,
   },
 ] as const;
-
-const titleBySection: Readonly<
-  Record<GrowthProductSection, string>
-> = {
-  overview: 'Executive Overview',
-  opportunities: 'Growth Opportunities',
-  campaigns: 'Campaign Portfolio',
-  intelligence: 'Growth Intelligence',
-  content: 'Content & Execution',
-  performance: 'Performance',
-  advisor: 'Growth Advisor',
-  team: 'Team & Users',
-  notifications: 'Notification Center',
-  settings: 'Settings',
-};
-
-const descriptionBySection: Readonly<
-  Record<GrowthProductSection, string>
-> = {
-  overview:
-    'Visualiza la situación, las prioridades y las siguientes acciones de crecimiento.',
-  opportunities:
-    'Prioriza oportunidades por potencial, evidencia y recomendación.',
-  campaigns:
-    'Gestiona estrategia, canales, mensajes, KPIs y ejecución.',
-  intelligence:
-    'Consulta recomendaciones, confianza, evidencia, riesgos y explicación.',
-  content:
-    'Coordina Brand Brain, planes, briefs, activos y ejecución.',
-  performance:
-    'Compara resultados, objetivos, tendencias y acciones correctivas.',
-  advisor:
-    'Trabaja con el copiloto ejecutivo de Aura Growth.',
-  team:
-    'Gestiona miembros, responsabilidades y participación comercial.',
-  notifications:
-    'Concentra alertas accionables y actividad relevante.',
-  settings:
-    'Configura empresa, objetivos, canales, Intelligence y seguridad.',
-};
 
 const GrowthProductShell: React.FC<
   GrowthProductShellProps
@@ -163,6 +132,61 @@ const GrowthProductShell: React.FC<
 }) => {
   const [isMobileNavigationOpen, setIsMobileNavigationOpen] =
     useState(false);
+
+  const {
+    messages,
+  } = useGrowthI18n();
+
+  const titleBySection:
+  Readonly<
+    Record<GrowthProductSection, string>
+  > = {
+    overview: messages.overview.pageTitle,
+    opportunities:
+      messages.nav.opportunityTitle,
+    campaigns:
+      messages.nav.campaignTitle,
+    intelligence:
+      messages.nav.intelligenceTitle,
+    content:
+      messages.nav.contentExecution,
+    performance:
+      messages.nav.performance,
+    advisor:
+      messages.nav.advisor,
+    team:
+      messages.nav.teamUsers,
+    notifications:
+      messages.nav.notificationTitle,
+    settings:
+      messages.nav.settings,
+  };
+
+  const descriptionBySection:
+  Readonly<
+    Record<GrowthProductSection, string>
+  > = {
+    overview:
+      messages.overview.pageDescription,
+    opportunities:
+      messages.opportunities.description,
+    campaigns:
+      messages.nav.campaignsDescription,
+    intelligence:
+      messages.nav.intelligenceDescription,
+    content:
+      messages.nav.contentExecutionDescription,
+    performance:
+      messages.nav.performanceDescription,
+    advisor:
+      messages.nav.advisorDescription,
+    team:
+      messages.nav.teamUsersDescription,
+    notifications:
+      messages.nav.notificationsDescription,
+    settings:
+      messages.nav.settingsDescription,
+  };
 
   const handleSectionChange = (
     section: GrowthProductSection,
@@ -202,11 +226,11 @@ const GrowthProductShell: React.FC<
 
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-bold">
-            {item.label}
+            {messages.nav[item.labelKey]}
           </span>
 
           <span className="mt-0.5 block truncate text-[11px] font-medium text-white/35">
-            {item.description}
+            {messages.nav[item.descriptionKey]}
           </span>
         </span>
 
@@ -237,14 +261,14 @@ const GrowthProductShell: React.FC<
           </p>
 
           <p className="mt-1 text-xs font-semibold text-white/35">
-            Growth Intelligence Platform
+            {messages.nav.growthPlatform}
           </p>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-4">
         <p className="px-3 pb-2 text-[9px] font-black uppercase tracking-[0.28em] text-white/25">
-          Growth
+          Aura Growth
         </p>
 
         <div className="space-y-1">
@@ -254,7 +278,7 @@ const GrowthProductShell: React.FC<
         <div className="my-4 border-t border-white/7" />
 
         <p className="px-3 pb-2 text-[9px] font-black uppercase tracking-[0.28em] text-white/25">
-          Workspace
+          {messages.nav.workspace}
         </p>
 
         <div className="space-y-1">
@@ -268,12 +292,12 @@ const GrowthProductShell: React.FC<
             <CircleGauge size={17} />
 
             <span className="text-xs font-black">
-              Growth Intelligence
+              {messages.nav.growthIntelligence}
             </span>
           </div>
 
           <p className="mt-2 text-[11px] leading-relaxed text-white/40">
-            Situation → Recommendation → Action
+            {messages.nav.intelligenceFlow}
           </p>
         </div>
       </div>
@@ -293,7 +317,7 @@ const GrowthProductShell: React.FC<
           <div className="absolute inset-0 z-40 flex lg:hidden">
             <button
               type="button"
-              aria-label="Cerrar navegación"
+              aria-label={messages.nav.closeNavigation}
               className="absolute inset-0 bg-black/70 backdrop-blur-sm"
               onClick={() => setIsMobileNavigationOpen(false)}
             />
@@ -309,7 +333,7 @@ const GrowthProductShell: React.FC<
             <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
-                aria-label="Abrir navegación"
+                aria-label={messages.nav.openNavigation}
                 onClick={() => setIsMobileNavigationOpen(true)}
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-white/65 transition hover:bg-white/[0.07] lg:hidden"
               >
@@ -336,12 +360,13 @@ const GrowthProductShell: React.FC<
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
+              <GrowthLanguageSelector />
               <button
                 type="button"
                 onClick={() =>
                   handleSectionChange('notifications')
                 }
-                aria-label="Abrir notificaciones"
+                aria-label={messages.nav.openNotifications}
                 className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-white/55 transition hover:border-cyan-300/25 hover:bg-cyan-300/[0.06] hover:text-cyan-200"
               >
                 <Bell size={18} />
@@ -354,7 +379,7 @@ const GrowthProductShell: React.FC<
                 onClick={() =>
                   handleSectionChange('settings')
                 }
-                aria-label="Abrir configuración"
+                aria-label={messages.nav.openSettings}
                 className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-white/55 transition hover:border-cyan-300/25 hover:bg-cyan-300/[0.06] hover:text-cyan-200"
               >
                 <Settings size={18} />
@@ -367,11 +392,11 @@ const GrowthProductShell: React.FC<
 
                 <div>
                   <p className="text-xs font-bold text-white/80">
-                    Growth Workspace
+                    Aura Growth
                   </p>
 
                   <p className="text-[10px] font-semibold text-white/30">
-                    Enterprise
+                    {messages.nav.enterprise}
                   </p>
                 </div>
               </div>
