@@ -4,12 +4,19 @@
 
 import React from 'react';
 import type { BrandBrain, BrandBrainField } from '../types/brandBrain';
+import { useGrowthI18n } from '../i18n/GrowthI18nProvider';
+import { presentGrowthEnum } from '../i18n/growthEnumPresentation';
 
 interface BrandBrainCardProps {
   brain: BrandBrain;
 }
 
 const FieldRow = ({ label, field }: { label: string; field?: BrandBrainField<unknown> }) => {
+  const { messages } =
+    useGrowthI18n();
+
+  const advisor =
+    messages.advisorPresentation;
   if (!field) return null;
   const isMissing = field.status === 'missing';
 
@@ -38,7 +45,7 @@ const FieldRow = ({ label, field }: { label: string; field?: BrandBrainField<unk
               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
               : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
           }`}>
-            {field.status}
+            {presentGrowthEnum('status', field.status, advisor)}
             {field.source && <span className="text-[8px] opacity-70">Source: {field.source}</span>}
           </span>
         )}

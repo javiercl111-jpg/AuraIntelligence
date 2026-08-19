@@ -1,11 +1,18 @@
 import React from 'react';
 import type { ContentRisk } from '../types/contentPlan';
+import { useGrowthI18n } from '../i18n/GrowthI18nProvider';
+import { presentGrowthEnum } from '../i18n/growthEnumPresentation';
 
 interface ContentRisksCardProps {
   risks: ContentRisk[];
 }
 
 export const ContentRisksCard: React.FC<ContentRisksCardProps> = ({ risks }) => {
+  const { messages } =
+    useGrowthI18n();
+
+  const advisor =
+    messages.advisorPresentation;
   if (risks.length === 0) {
     return null;
   }
@@ -25,8 +32,8 @@ export const ContentRisksCard: React.FC<ContentRisksCardProps> = ({ risks }) => 
             <div>
               <p className="text-sm text-slate-800 font-medium">{risk.description}</p>
               <div className="flex gap-3 mt-1 text-[11px] text-slate-500 uppercase font-semibold">
-                <span>Severidad: {risk.severity}</span>
-                <span>Estado: {risk.mitigationStatus}</span>
+                <span>Severidad: {presentGrowthEnum('severity', risk.severity, advisor)}</span>
+                <span>Estado: {presentGrowthEnum('mitigation', risk.mitigationStatus, advisor)}</span>
               </div>
             </div>
           </div>

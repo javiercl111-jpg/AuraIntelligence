@@ -6,6 +6,7 @@ import { ConstraintCard } from './ConstraintCard';
 import { SuccessCriteriaCard } from './SuccessCriteriaCard';
 import { EvidenceSummary } from './EvidenceSummary';
 import { NextGenerationActionCard } from './NextGenerationActionCard';
+import { useGrowthI18n } from '../i18n/GrowthI18nProvider';
 
 interface ExecutiveContentBriefSummaryProps {
   brief: ExecutiveContentBrief | null;
@@ -13,6 +14,11 @@ interface ExecutiveContentBriefSummaryProps {
 }
 
 export const ExecutiveContentBriefSummary: React.FC<ExecutiveContentBriefSummaryProps> = ({ brief, onExecuteAction }) => {
+  const { messages } =
+    useGrowthI18n();
+
+  const advisor =
+    messages.advisorPresentation;
   if (!brief) return null;
 
   return (
@@ -20,16 +26,16 @@ export const ExecutiveContentBriefSummary: React.FC<ExecutiveContentBriefSummary
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="bg-slate-50 border-b border-slate-200 p-6 flex justify-between items-start">
           <div>
-            <h2 className="text-xl font-semibold text-slate-800">Executive Content Brief</h2>
-            <p className="text-sm text-slate-500 mt-1">Directrices de producción para motores de IA generativa.</p>
+            <h2 className="text-xl font-semibold text-slate-800">{advisor.executiveContentBrief}</h2>
+            <p className="text-sm text-slate-500 mt-1">{advisor.executiveContentBriefDescription}</p>
           </div>
           <span className={`px-3 py-1 text-sm font-medium rounded-full ${
             brief.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
             brief.status === 'review_required' ? 'bg-amber-100 text-amber-700' :
             'bg-slate-100 text-slate-700'
           }`}>
-            {brief.status === 'approved' ? 'Aprobado' :
-             brief.status === 'review_required' ? 'Revisión Requerida' : 'Borrador'}
+            {brief.status === 'approved' ? advisor.approved :
+             brief.status === 'review_required' ? advisor.reviewRequired : advisor.draft}
           </span>
         </div>
 

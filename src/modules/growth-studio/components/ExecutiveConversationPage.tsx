@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import React, { useEffect, useState, useRef } from 'react';
-import { useGrowthConversation } from '../hooks/useGrowthConversation';
+import { useGrowthRuntime } from '../runtime/GrowthRuntimeProvider';
 import ConversationBubble from './ConversationBubble';
 import TypingIndicator from './TypingIndicator';
 import { ContentPlanSummary } from './ContentPlanSummary';
@@ -14,13 +14,19 @@ import BrandBrainSummary from './BrandBrainSummary';
 import CampaignStrategySummary from './CampaignStrategySummary';
 import { ExecutiveExecutionPlanSummary } from './ExecutiveExecutionPlanSummary';
 import { ExecutiveContentBriefSummary } from './ExecutiveContentBriefSummary';
+import { useGrowthI18n } from '../i18n/GrowthI18nProvider';
 
 interface ExecutiveConversationPageProps {
   onClose: () => void;
 }
 
 export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps> = ({ onClose }) => {
-  const { conversation, turns, objective, brandBrain, campaignStrategy, execution, contentPlan, contentBrief, isTyping, error, start, addTurn } = useGrowthConversation();
+  const { messages } =
+    useGrowthI18n();
+
+  const advisor =
+    messages.advisorPresentation;
+  const { conversation, turns, objective, brandBrain, campaignStrategy, execution, contentPlan, contentBrief, isTyping, error, start, addTurn } = useGrowthRuntime();
   const [inputValue, setInputValue] = useState('');
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
@@ -68,13 +74,13 @@ export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps>
       {/* Header */}
       <header className="flex justify-between items-center px-6 py-4 border-b border-emerald-400/20 bg-emerald-950/30">
         <div>
-          <h2 className="text-lg font-bold text-white">Executive Growth Conversation</h2>
-          <p className="text-xs text-emerald-300/70 tracking-widest uppercase">Mock Session (No AI)</p>
+          <h2 className="text-lg font-bold text-white">{advisor.conversationTitle}</h2>
+          <p className="text-xs text-emerald-300/70 tracking-widest uppercase">{advisor.mockSession}</p>
         </div>
         <button
           onClick={onClose}
           className="text-emerald-400/60 hover:text-emerald-400 transition-colors"
-          aria-label="Cerrar conversación"
+          aria-label={advisor.closeConversation}
         >
           ✕
         </button>
@@ -128,8 +134,8 @@ export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps>
             disabled={isTyping || conversation.status === 'completed'}
             placeholder={
               conversation.status === 'completed'
-                ? 'Conversación finalizada'
-                : 'Escribe tu respuesta...'
+                ? advisor.completedPlaceholder
+                : advisor.answerPlaceholder
             }
             className="flex-1 bg-[#1a202c]/50 border border-emerald-400/20 rounded-xl px-4 py-3 text-emerald-50 focus:outline-none focus:border-emerald-400/50 focus:ring-1 focus:ring-emerald-400/50 disabled:opacity-50"
           />
@@ -138,7 +144,7 @@ export const ExecutiveConversationPage: React.FC<ExecutiveConversationPageProps>
             disabled={!inputValue.trim() || isTyping || conversation.status === 'completed'}
             className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-900 disabled:text-emerald-500/50 text-emerald-950 font-bold rounded-xl transition-colors"
           >
-            Enviar
+            {advisor.send}
           </button>
         </form>
       </div>

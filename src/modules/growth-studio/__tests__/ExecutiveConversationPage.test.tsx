@@ -1,5 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach } from 'vitest';
+import { GrowthI18nProvider } from '../i18n/GrowthI18nProvider';
+import { GrowthRuntimeProvider } from '../runtime/GrowthRuntimeProvider';
 import ExecutiveConversationPage from '../components/ExecutiveConversationPage';
 import { setMockResponseDelay } from '../services/growthConversationMockService';
 import '@testing-library/jest-dom';
@@ -10,13 +12,21 @@ describe('ExecutiveConversationPage', () => {
   });
 
   it('renders and starts conversation', async () => {
-    render(<ExecutiveConversationPage onClose={() => {}} />);
+    render(
+      <GrowthI18nProvider>
+          <GrowthRuntimeProvider>
+        <ExecutiveConversationPage
+          onClose={() => {}}
+        />
+      </GrowthRuntimeProvider>
+        </GrowthI18nProvider>,
+    );
 
     // Wait for the header and conversation to load
     await waitFor(() => {
-      expect(screen.getByText('Executive Growth Conversation')).toBeInTheDocument();
+      expect(screen.getByText('Conversación Ejecutiva de Crecimiento')).toBeInTheDocument();
     });
-    expect(screen.getByText('Mock Session (No AI)')).toBeInTheDocument();
+    expect(screen.getByText('Sesión de demostración · Sin IA productiva')).toBeInTheDocument();
 
     // Wait for the first assistant message
     await waitFor(() => {
@@ -27,7 +37,15 @@ describe('ExecutiveConversationPage', () => {
   it('blocks double submission while typing', async () => {
     // Add artificial delay just for this test to catch the "isTyping" state
     setMockResponseDelay(100);
-    render(<ExecutiveConversationPage onClose={() => {}} />);
+    render(
+      <GrowthI18nProvider>
+          <GrowthRuntimeProvider>
+        <ExecutiveConversationPage
+          onClose={() => {}}
+        />
+      </GrowthRuntimeProvider>
+        </GrowthI18nProvider>,
+    );
 
     // Wait for initial load
     await waitFor(() => {
@@ -54,7 +72,15 @@ describe('ExecutiveConversationPage', () => {
 
   it('prevents submission of empty strings', async () => {
     setMockResponseDelay(0);
-    render(<ExecutiveConversationPage onClose={() => {}} />);
+    render(
+      <GrowthI18nProvider>
+          <GrowthRuntimeProvider>
+        <ExecutiveConversationPage
+          onClose={() => {}}
+        />
+      </GrowthRuntimeProvider>
+        </GrowthI18nProvider>,
+    );
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText('Escribe tu respuesta...')).toBeInTheDocument();
@@ -71,7 +97,15 @@ describe('ExecutiveConversationPage', () => {
 
   it('progresa por el flujo completo y verifica los resúmenes de Objective y Brand Brain en la UI', async () => {
     setMockResponseDelay(0);
-    render(<ExecutiveConversationPage onClose={() => {}} />);
+    render(
+      <GrowthI18nProvider>
+          <GrowthRuntimeProvider>
+        <ExecutiveConversationPage
+          onClose={() => {}}
+        />
+      </GrowthRuntimeProvider>
+        </GrowthI18nProvider>,
+    );
 
     // 1. Iniciar en welcome / waiting for objective
     await waitFor(() => {
@@ -79,7 +113,7 @@ describe('ExecutiveConversationPage', () => {
     });
 
     // Verificar que NO se renderizan los resúmenes en etapas iniciales
-    expect(screen.queryAllByText(/Growth Objective/i)).toHaveLength(0);
+    expect(screen.queryAllByText(/Objetivo de Crecimiento/i)).toHaveLength(0);
     expect(screen.queryAllByText(/Memoria de Identidad/i)).toHaveLength(0);
     expect(screen.queryAllByText(/Nivel de conocimiento de marca/i)).toHaveLength(0);
 
@@ -110,16 +144,45 @@ describe('ExecutiveConversationPage', () => {
     });
     fireEvent.change(input, { target: { value: 'Incrementar ventas 20%' } });
     fireEvent.click(submitBtn);
+    // El flujo vigente solicita canales antes de la reflexión.
+    await waitFor(() => {
+      expect(
+        screen.getByText(/¿En qué canales o medios quieres desarrollar esta estrategia/i),
+      ).toBeInTheDocument();
+      expect(input).not.toBeDisabled();
+    });
+
+    fireEvent.change(input, {
+      target: {
+        value: 'LinkedIn, email',
+      },
+    });
+    fireEvent.click(submitBtn);
+
+    // Después de canales, el flujo solicita el CTA principal.
+    await waitFor(() => {
+      expect(
+        screen.getByText(/¿Cuál quieres que sea el llamado a la acción principal/i),
+      ).toBeInTheDocument();
+      expect(input).not.toBeDisabled();
+    });
+
+    fireEvent.change(input, {
+      target: {
+        value: 'Agendar una demostración',
+      },
+    });
+    fireEvent.click(submitBtn);
 
     // Esperar a llegar a la fase executive_reflection
     await waitFor(() => {
       // Debería renderizarse el Resumen del Objetivo
-      expect(screen.getAllByText(/Growth Objective/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/Objetivo de Crecimiento/i).length).toBeGreaterThan(0);
     });
 
     await waitFor(() => {
       // Debería renderizarse el Brand Brain Summary
-      expect(screen.getByText(/Memoria de Identidad/i)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /Memoria de Identidad/i, level: 3 })).toBeInTheDocument();
     });
 
     await waitFor(() => {
@@ -148,7 +211,7 @@ describe('ExecutiveConversationPage', () => {
       // Debería aparecer la propuesta preliminar
       expect(screen.getByText(/Propuesta preliminar de demostración/i)).toBeInTheDocument();
       // Los resúmenes no deberían seguir mostrándose en esta etapa si la UI los oculta
-      expect(screen.queryAllByText(/Growth Objective/i)).toHaveLength(0);
+      expect(screen.queryAllByText(/Objetivo de Crecimiento/i)).toHaveLength(0);
       expect(screen.queryAllByText(/Memoria de Identidad/i)).toHaveLength(0);
     });
   });

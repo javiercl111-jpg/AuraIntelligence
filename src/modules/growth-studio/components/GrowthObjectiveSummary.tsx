@@ -6,12 +6,18 @@ import React from 'react';
 import type { GrowthObjective } from '../types/growthObjective';
 import CompletionIndicator from './CompletionIndicator';
 import GrowthObjectiveCard from './GrowthObjectiveCard';
+import { useGrowthI18n } from '../i18n/GrowthI18nProvider';
 
 interface GrowthObjectiveSummaryProps {
   objective: GrowthObjective;
 }
 
 export const GrowthObjectiveSummary: React.FC<GrowthObjectiveSummaryProps> = ({ objective }) => {
+  const { messages } =
+    useGrowthI18n();
+
+  const advisor =
+    messages.advisorPresentation;
   const hasErrors = (objective.validationErrors?.length || 0) > 0;
 
   return (
@@ -19,14 +25,14 @@ export const GrowthObjectiveSummary: React.FC<GrowthObjectiveSummaryProps> = ({ 
       <div className="bg-[#0d1117] rounded-xl p-6 h-full flex flex-col gap-6">
         <div className="flex justify-between items-start border-b border-white/5 pb-4">
           <div>
-            <h3 className="text-lg font-black text-white tracking-wide">Growth Objective</h3>
+            <h3 className="text-lg font-black text-white tracking-wide">{advisor.growthObjective}</h3>
             <div className="flex gap-2 mt-2">
               <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white/10 text-white/70">
-                Estado: {objective.status}
+                {advisor.status}: {objective.status}
               </span>
               {hasErrors && (
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">
-                  Bloqueado: Faltan datos críticos
+                  {advisor.blockedMissingCriticalData}
                 </span>
               )}
             </div>

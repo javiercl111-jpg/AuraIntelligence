@@ -35,7 +35,7 @@ describe('GrowthConversationMockService', () => {
     await growthConversationService.generateAssistantResponse(conv.id);
     let updatedConv = await growthConversationService.getConversation(conv.id);
     expect(updatedConv?.currentStage).toBe('understanding_audience');
-    expect(updatedConv?.structuredContext.objective).toBe('vender/comercializar');
+    expect(updatedConv?.structuredContext.objective).toBe('Quiero vender');
     expect(updatedConv?.structuredContext.productOrService).toBe('Aura HCM');
 
     // 2. Send Audience -> expect Region question
@@ -50,13 +50,40 @@ describe('GrowthConversationMockService', () => {
     updatedConv = await growthConversationService.getConversation(conv.id);
     expect(updatedConv?.currentStage).toBe('understanding_result');
 
-    // 4. Send Result -> expect Reflection
+    // 4. Send Result -> expect Channels question
     await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'My result' });
     await growthConversationService.generateAssistantResponse(conv.id);
     updatedConv = await growthConversationService.getConversation(conv.id);
-    expect(updatedConv?.currentStage).toBe('executive_reflection');
+    expect(updatedConv?.currentStage).toBe('understanding_channels');
+    expect(updatedConv?.structuredContext.expectedResult).toBe('My result');
 
-    // 5. Send Confirmation directly -> expect Proposal
+    // 5. Send Channels -> expect CTA question
+    await growthConversationService.addTurn({
+      conversationId: conv.id,
+      role: 'user',
+      content: 'LinkedIn, Email'
+    });
+    await growthConversationService.generateAssistantResponse(conv.id);
+    updatedConv = await growthConversationService.getConversation(conv.id);
+    expect(updatedConv?.currentStage).toBe('understanding_cta');
+    expect(updatedConv?.structuredContext.campaignChannels).toEqual([
+      'LinkedIn',
+      'Email'
+    ]);
+
+    // 6. Send CTA -> expect Reflection
+    await growthConversationService.addTurn({
+      conversationId: conv.id,
+      role: 'user',
+      content: 'Agendar una demostración'
+    });
+    await growthConversationService.generateAssistantResponse(conv.id);
+    updatedConv = await growthConversationService.getConversation(conv.id);
+    expect(updatedConv?.currentStage).toBe('executive_reflection');
+    expect(updatedConv?.structuredContext.campaignCallToAction).toBe(
+      'Agendar una demostración'
+    );
+    // 7. Send Confirmation -> expect Proposal
     await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'Sí, es correcto' });
     await growthConversationService.generateAssistantResponse(conv.id);
     updatedConv = await growthConversationService.getConversation(conv.id);
@@ -94,7 +121,7 @@ describe('GrowthConversationMockService', () => {
       tenantId: 'test', companyId: 'test', userId: 'test'
     });
 
-    // Fast-forward to reflection
+    // Fast-forward to reflection through campaign intake
     await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'Quiero vender Aura HCM' });
     await growthConversationService.generateAssistantResponse(conv.id);
     await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'My audience' });
@@ -103,9 +130,19 @@ describe('GrowthConversationMockService', () => {
     await growthConversationService.generateAssistantResponse(conv.id);
     await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'My result' });
     await growthConversationService.generateAssistantResponse(conv.id);
+    await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'LinkedIn' });
+    await growthConversationService.generateAssistantResponse(conv.id);
+    await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'Agendar demo' });
+    await growthConversationService.generateAssistantResponse(conv.id);
+
     let updatedConv = await growthConversationService.getConversation(conv.id);
     expect(updatedConv?.currentStage).toBe('executive_reflection');
-
+    expect(updatedConv?.structuredContext.campaignChannels).toEqual([
+      'LinkedIn'
+    ]);
+    expect(updatedConv?.structuredContext.campaignCallToAction).toBe(
+      'Agendar demo'
+    );
     // User corrects audience
     await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'cambiar audiencia a Pymes' });
     await growthConversationService.generateAssistantResponse(conv.id);
@@ -121,21 +158,30 @@ describe('GrowthConversationMockService', () => {
     });
     const convId = startedConv.id;
 
-    // 2. Llegar a executive_reflection
+    // 2. Llegar a executive_reflection through campaign intake
     await growthConversationService.addTurn({ conversationId: convId, content: 'vender producto', role: 'user' });
     await growthConversationService.generateAssistantResponse(convId);
-    await growthConversationService.addTurn({ conversationId: convId, content: 'Aura HCM', role: 'user' });
-    await growthConversationService.generateAssistantResponse(convId);
+
     await growthConversationService.addTurn({ conversationId: convId, content: 'Hoteles', role: 'user' });
     await growthConversationService.generateAssistantResponse(convId);
     await growthConversationService.addTurn({ conversationId: convId, content: 'México', role: 'user' });
     await growthConversationService.generateAssistantResponse(convId);
     await growthConversationService.addTurn({ conversationId: convId, content: 'Aumentar ventas 20%', role: 'user' });
     await growthConversationService.generateAssistantResponse(convId);
+    await growthConversationService.addTurn({ conversationId: convId, content: 'LinkedIn, Email', role: 'user' });
+    await growthConversationService.generateAssistantResponse(convId);
+    await growthConversationService.addTurn({ conversationId: convId, content: 'Solicitar una demostración', role: 'user' });
+    await growthConversationService.generateAssistantResponse(convId);
 
     let conv = await growthConversationService.getConversation(convId);
     expect(conv?.currentStage).toBe('executive_reflection');
-
+    expect(conv?.structuredContext.campaignChannels).toEqual([
+      'LinkedIn',
+      'Email'
+    ]);
+    expect(conv?.structuredContext.campaignCallToAction).toBe(
+      'Solicitar una demostración'
+    );
     // 3. Corregir industria (Brand Brain)
     await growthConversationService.addTurn({ conversationId: convId, content: 'cambiar industria a Software B2B', role: 'user' });
     await growthConversationService.generateAssistantResponse(convId);
@@ -152,6 +198,192 @@ describe('GrowthConversationMockService', () => {
     expect(conv?.currentStage).toBe('executive_proposal');
   });
 
+  it('captures explicit channel recommendation delegation without treating uncertainty as authorization', async () => {
+    const delegated =
+      await growthConversationService.startConversation({
+        userId: 'user-delegated',
+        tenantId: 'tenant-delegated',
+        companyId: 'company-delegated',
+      });
+
+    await growthConversationService.addTurn({
+      conversationId: delegated.id,
+      role: 'user',
+      content: 'Quiero vender Aura HCM',
+    });
+    await growthConversationService.generateAssistantResponse(
+      delegated.id,
+    );
+
+    await growthConversationService.addTurn({
+      conversationId: delegated.id,
+      role: 'user',
+      content: 'Hoteles',
+    });
+    await growthConversationService.generateAssistantResponse(
+      delegated.id,
+    );
+
+    await growthConversationService.addTurn({
+      conversationId: delegated.id,
+      role: 'user',
+      content: 'México',
+    });
+    await growthConversationService.generateAssistantResponse(
+      delegated.id,
+    );
+
+    await growthConversationService.addTurn({
+      conversationId: delegated.id,
+      role: 'user',
+      content: 'Incrementar ventas 20%',
+    });
+    await growthConversationService.generateAssistantResponse(
+      delegated.id,
+    );
+
+    await growthConversationService.addTurn({
+      conversationId: delegated.id,
+      role: 'user',
+      content: 'Aura, recomiéndame',
+    });
+    await growthConversationService.generateAssistantResponse(
+      delegated.id,
+    );
+
+    const delegatedState =
+      await growthConversationService.getConversation(
+        delegated.id,
+      );
+
+    expect(
+      delegatedState?.currentStage,
+    ).toBe('understanding_cta');
+
+    expect(
+      delegatedState?.structuredContext
+        .campaignChannelRecommendationRequested,
+    ).toBe(true);
+
+    expect(
+      delegatedState?.structuredContext
+        .campaignChannels,
+    ).toBeUndefined();
+
+    const uncertain =
+      await growthConversationService.startConversation({
+        userId: 'user-uncertain',
+        tenantId: 'tenant-uncertain',
+        companyId: 'company-uncertain',
+      });
+
+    await growthConversationService.addTurn({
+      conversationId: uncertain.id,
+      role: 'user',
+      content: 'Quiero vender Aura HCM',
+    });
+    await growthConversationService.generateAssistantResponse(
+      uncertain.id,
+    );
+
+    await growthConversationService.addTurn({
+      conversationId: uncertain.id,
+      role: 'user',
+      content: 'Hoteles',
+    });
+    await growthConversationService.generateAssistantResponse(
+      uncertain.id,
+    );
+
+    await growthConversationService.addTurn({
+      conversationId: uncertain.id,
+      role: 'user',
+      content: 'México',
+    });
+    await growthConversationService.generateAssistantResponse(
+      uncertain.id,
+    );
+
+    await growthConversationService.addTurn({
+      conversationId: uncertain.id,
+      role: 'user',
+      content: 'Incrementar ventas 20%',
+    });
+    await growthConversationService.generateAssistantResponse(
+      uncertain.id,
+    );
+
+    await growthConversationService.addTurn({
+      conversationId: uncertain.id,
+      role: 'user',
+      content: 'No sé',
+    });
+    await growthConversationService.generateAssistantResponse(
+      uncertain.id,
+    );
+
+    const uncertainState =
+      await growthConversationService.getConversation(
+        uncertain.id,
+      );
+
+    expect(
+      uncertainState?.structuredContext
+        .campaignChannelRecommendationRequested,
+    ).toBe(false);
+
+    expect(
+      uncertainState?.structuredContext
+        .campaignChannels,
+    ).toBeUndefined();
+  });
+  it("preserves the user's commercial intent while extracting the product", async () => {
+    const conversation =
+      await growthConversationService.startConversation({
+        userId: 'user-objective-parser',
+        tenantId: 'tenant-objective-parser',
+        companyId: 'company-objective-parser',
+      });
+
+    await growthConversationService.addTurn({
+      conversationId: conversation.id,
+      role: 'user',
+      content: 'Quiero comercializar Aura HCM',
+    });
+
+    await growthConversationService.generateAssistantResponse(
+      conversation.id,
+    );
+
+    const state =
+      await growthConversationService.getConversation(
+        conversation.id,
+      );
+
+    expect(
+      state?.structuredContext.objective,
+    ).toBe('Quiero comercializar');
+
+    expect(
+      state?.structuredContext.productOrService,
+    ).toBe('Aura HCM');
+
+    expect(
+      state?.structuredContext.audience,
+    ).toBeUndefined();
+
+    expect(
+      state?.structuredContext.region,
+    ).toBeUndefined();
+
+    expect(
+      state?.structuredContext.expectedResult,
+    ).toBeUndefined();
+
+    expect(
+      state?.currentStage,
+    ).toBe('understanding_audience');
+  });
   it('rejects empty input', async () => {
     const conv = await growthConversationService.startConversation({
       tenantId: 'test', companyId: 'test', userId: 'test'
