@@ -29,6 +29,10 @@ import {
   getDevelopmentProductSurface,
 } from './productSurface';
 
+import {
+  getGrowthPreviewAccess,
+} from './growthPreviewAccess';
+
 const buildDemoContext = (
   userEmail?: string | null,
 ): AuraIntelligenceContext => ({
@@ -62,6 +66,9 @@ const App: React.FC = () => {
 
   const isGrowthSurface =
     productSurface === 'growth';
+
+  const hasLocalGrowthPreviewAccess =
+    getGrowthPreviewAccess();
 
   const [isAuthReady, setIsAuthReady] =
     useState(false);
@@ -136,7 +143,8 @@ const App: React.FC = () => {
 
   if (
     isGrowthSurface &&
-    !isAuthenticated
+    !isAuthenticated &&
+    !hasLocalGrowthPreviewAccess
   ) {
     return (
       <AuraGrowthLogin
@@ -149,7 +157,10 @@ const App: React.FC = () => {
 
   if (
     isGrowthSurface &&
-    isAuthenticated
+    (
+      isAuthenticated ||
+      hasLocalGrowthPreviewAccess
+    )
   ) {
     return (
       <main className="min-h-screen bg-[#07111f] text-white">
