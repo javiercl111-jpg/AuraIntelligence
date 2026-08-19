@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 
 import {
   ArrowRight,
@@ -9,6 +9,8 @@ import {
   Target,
   TrendingUp,
 } from 'lucide-react';
+
+import { useGrowthI18n } from '../i18n/GrowthI18nProvider';
 
 export interface GrowthExecutiveOverviewProps {
   readonly onOpenAdvisor?: () => void;
@@ -27,33 +29,6 @@ interface OverviewMetric {
   }>;
 }
 
-const metrics: readonly OverviewMetric[] = [
-  {
-    label: 'Growth Score',
-    value: 'Pending',
-    detail: 'Disponible cuando exista evidencia suficiente',
-    icon: TrendingUp,
-  },
-  {
-    label: 'Priority Opportunities',
-    value: '—',
-    detail: 'Aura priorizará oportunidades verificadas',
-    icon: Target,
-  },
-  {
-    label: 'Active Campaigns',
-    value: '—',
-    detail: 'Sin campañas activas conectadas todavía',
-    icon: Megaphone,
-  },
-  {
-    label: 'Performance',
-    value: '—',
-    detail: 'Los KPIs aparecerán al conectar fuentes',
-    icon: BarChart3,
-  },
-] as const;
-
 const GrowthExecutiveOverview: React.FC<
   GrowthExecutiveOverviewProps
 > = ({
@@ -62,6 +37,42 @@ const GrowthExecutiveOverview: React.FC<
   onOpenCampaigns,
   onOpenIntelligence,
 }) => {
+  const {
+    messages,
+  } = useGrowthI18n();
+
+  const metrics: readonly OverviewMetric[] = [
+    {
+      label: messages.overview.growthScore,
+      value: messages.common.pending,
+      detail: messages.overview.evidencePending,
+      icon: TrendingUp,
+    },
+    {
+      label:
+        messages.overview.priorityOpportunities,
+      value: '—',
+      detail:
+        messages.overview.verifiedOpportunityDetail,
+      icon: Target,
+    },
+    {
+      label:
+        messages.overview.activeCampaigns,
+      value: '—',
+      detail:
+        messages.overview.noActiveCampaigns,
+      icon: Megaphone,
+    },
+    {
+      label: messages.overview.performance,
+      value: '—',
+      detail:
+        messages.overview.kpiSourceDetail,
+      icon: BarChart3,
+    },
+  ];
+
   return (
     <div
       id="growth-executive-overview"
@@ -79,18 +90,16 @@ const GrowthExecutiveOverview: React.FC<
               />
 
               <span className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100/80">
-                Executive Growth Intelligence
+                {messages.overview.intelligenceLabel}
               </span>
             </div>
 
             <h3 className="mt-5 text-2xl font-black tracking-tight text-white md:text-3xl">
-              Convierte señales de crecimiento en decisiones claras.
+              {messages.overview.heroTitle}
             </h3>
 
             <p className="mt-3 max-w-2xl text-sm font-medium leading-7 text-white/45">
-              Aura conecta objetivos, oportunidades, campañas,
-              ejecución y resultados para recomendar la siguiente
-              acción con evidencia y gobierno.
+              {messages.overview.heroDescription}
             </p>
           </div>
 
@@ -99,7 +108,7 @@ const GrowthExecutiveOverview: React.FC<
             onClick={onOpenAdvisor}
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-300/25 bg-cyan-300/10 px-5 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-300/15"
           >
-            Abrir Growth Advisor
+            {messages.overview.openAdvisor}
             <ArrowRight size={16} />
           </button>
         </div>
@@ -120,7 +129,7 @@ const GrowthExecutiveOverview: React.FC<
                 </div>
 
                 <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/25">
-                  Governed
+                  {messages.common.governed}
                 </span>
               </div>
 
@@ -149,16 +158,15 @@ const GrowthExecutiveOverview: React.FC<
           <Target size={22} className="text-cyan-200" />
 
           <h4 className="mt-5 text-base font-black text-white">
-            Opportunities
+            {messages.overview.opportunities}
           </h4>
 
           <p className="mt-2 text-xs leading-6 text-white/35">
-            Identifica y prioriza oportunidades según potencial,
-            evidencia y recomendación de Aura.
+            {messages.overview.opportunityDescription}
           </p>
 
           <span className="mt-5 inline-flex items-center gap-2 text-xs font-black text-cyan-200">
-            Explorar oportunidades
+            {messages.overview.exploreOpportunities}
             <ArrowRight size={14} />
           </span>
         </button>
@@ -171,16 +179,15 @@ const GrowthExecutiveOverview: React.FC<
           <Megaphone size={22} className="text-cyan-200" />
 
           <h4 className="mt-5 text-base font-black text-white">
-            Campaigns
+            {messages.overview.campaigns}
           </h4>
 
           <p className="mt-2 text-xs leading-6 text-white/35">
-            Convierte estrategia en campañas gobernadas con
-            audiencia, canales, mensajes y KPIs.
+            {messages.overview.campaignDescription}
           </p>
 
           <span className="mt-5 inline-flex items-center gap-2 text-xs font-black text-cyan-200">
-            Gestionar campañas
+            {messages.overview.manageCampaigns}
             <ArrowRight size={14} />
           </span>
         </button>
@@ -193,16 +200,15 @@ const GrowthExecutiveOverview: React.FC<
           <BrainCircuit size={22} className="text-cyan-200" />
 
           <h4 className="mt-5 text-base font-black text-white">
-            Intelligence
+            {messages.overview.intelligence}
           </h4>
 
           <p className="mt-2 text-xs leading-6 text-white/35">
-            Comprende recomendaciones, evidencia, confianza,
-            riesgos y siguientes acciones.
+            {messages.overview.intelligenceDescription}
           </p>
 
           <span className="mt-5 inline-flex items-center gap-2 text-xs font-black text-cyan-200">
-            Abrir Intelligence
+            {messages.overview.openIntelligence}
             <ArrowRight size={14} />
           </span>
         </button>
@@ -212,17 +218,15 @@ const GrowthExecutiveOverview: React.FC<
         <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/25">
-              Next Best Action
+              {messages.overview.nextBestAction}
             </p>
 
             <h4 className="mt-2 text-base font-black text-white">
-              Completa tu contexto de crecimiento
+              {messages.overview.completeGrowthContext}
             </h4>
 
             <p className="mt-2 max-w-2xl text-xs leading-6 text-white/35">
-              Growth Advisor puede ayudarte a definir objetivos,
-              Brand Brain, estrategia y plan de ejecución antes de
-              activar fuentes productivas.
+              {messages.overview.advisorContextDescription}
             </p>
           </div>
 
@@ -231,7 +235,7 @@ const GrowthExecutiveOverview: React.FC<
             onClick={onOpenAdvisor}
             className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs font-black text-white/70 transition hover:border-cyan-300/20 hover:text-cyan-200"
           >
-            Continuar con Advisor
+            {messages.overview.continueAdvisor}
             <ArrowRight size={14} />
           </button>
         </div>

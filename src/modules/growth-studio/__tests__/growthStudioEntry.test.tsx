@@ -50,7 +50,7 @@ describe('GrowthStudioEntry', () => {
     ).toBeTruthy();
 
     expect(
-      screen.getByText('Executive Overview'),
+      screen.getByText('Resumen Ejecutivo'),
     ).toBeTruthy();
 
     expect(
@@ -61,16 +61,16 @@ describe('GrowthStudioEntry', () => {
   it('renders the complete Growth product navigation', () => {
     render(<GrowthStudioEntry />);
 
-    expect(screen.getByText('Overview')).toBeTruthy();
-    expect(screen.getAllByText('Opportunities').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Campaigns').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Intelligence').length).toBeGreaterThan(0);
-    expect(screen.getByText('Content & Execution')).toBeTruthy();
-    expect(screen.getAllByText('Performance').length).toBeGreaterThan(0);
+    expect(screen.getByText('Resumen')).toBeTruthy();
+    expect(screen.getAllByText('Oportunidades').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Campañas').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Inteligencia').length).toBeGreaterThan(0);
+    expect(screen.getByText('Contenido y Ejecución')).toBeTruthy();
+    expect(screen.getAllByText('Rendimiento').length).toBeGreaterThan(0);
     expect(screen.getByText('Growth Advisor')).toBeTruthy();
-    expect(screen.getByText('Team & Users')).toBeTruthy();
-    expect(screen.getByText('Notifications')).toBeTruthy();
-    expect(screen.getByText('Settings')).toBeTruthy();
+    expect(screen.getByText('Equipo y Usuarios')).toBeTruthy();
+    expect(screen.getByText('Notificaciones')).toBeTruthy();
+    expect(screen.getByText('Configuración')).toBeTruthy();
   });
 
   it('does not expose the obsolete provisional presentation', () => {
@@ -119,7 +119,7 @@ describe('GrowthStudioEntry', () => {
     );
 
     expect(
-      screen.getByText('Executive Overview'),
+      screen.getByText('Resumen Ejecutivo'),
     ).toBeTruthy();
 
     expect(
@@ -134,24 +134,24 @@ describe('GrowthStudioEntry', () => {
 
     fireEvent.click(
       screen.getByRole('button', {
-        name: /^opportunitiespipeline y potencial$/i,
+        name: /^oportunidadespipeline y potencial$/i,
       }),
     );
 
     expect(
-      screen.getByText('Growth Opportunities'),
+      screen.getByText('Oportunidades de Crecimiento'),
     ).toBeTruthy();
 
     fireEvent.click(
       screen.getByRole('button', {
-        name: /^settings/i,
+        name: /^configuración/i,
       }),
     );
 
     expect(
-      screen.getByText(
-        'Configura empresa, objetivos, canales, Intelligence y seguridad.',
-      ),
-    ).toBeTruthy();
+      screen.getAllByText(
+        'Empresa, canales y permisos',
+      ).length,
+    ).toBeGreaterThanOrEqual(2);
   });
 });

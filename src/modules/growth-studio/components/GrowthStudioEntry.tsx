@@ -1,8 +1,16 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
+
+import {
+  GrowthI18nProvider,
+} from '../i18n/GrowthI18nProvider';
+
+import { GrowthRuntimeProvider } from '../runtime/GrowthRuntimeProvider';
 
 import ExecutiveConversationPage from './ExecutiveConversationPage';
 
 import GrowthExecutiveOverview from '../product/GrowthExecutiveOverview';
+import GrowthOpportunitiesWorkspace from '../product/GrowthOpportunitiesWorkspace';
+import GrowthCampaignsWorkspace from '../product/GrowthCampaignsWorkspace';
 
 import GrowthProductShell, {
   type GrowthProductSection,
@@ -19,8 +27,10 @@ export const GrowthStudioEntry: React.FC = () => {
   };
 
   return (
-    <div id="growth-studio-entry">
-      <GrowthProductShell
+    <GrowthI18nProvider>
+      <GrowthRuntimeProvider>
+        <div id="growth-studio-entry">
+        <GrowthProductShell
         activeSection={activeSection}
         onSectionChange={openSection}
       >
@@ -41,6 +51,16 @@ export const GrowthStudioEntry: React.FC = () => {
           />
         )}
 
+        {activeSection === 'opportunities' && (
+          <GrowthOpportunitiesWorkspace />
+        )}
+        {activeSection === 'campaigns' && (
+          <GrowthCampaignsWorkspace
+            onOpenAdvisor={() =>
+              openSection('advisor')
+            }
+          />
+        )}
         {activeSection === 'advisor' && (
           <ExecutiveConversationPage
             onClose={() =>
@@ -48,8 +68,10 @@ export const GrowthStudioEntry: React.FC = () => {
             }
           />
         )}
-      </GrowthProductShell>
-    </div>
+        </GrowthProductShell>
+        </div>
+      </GrowthRuntimeProvider>
+    </GrowthI18nProvider>
   );
 };
 
