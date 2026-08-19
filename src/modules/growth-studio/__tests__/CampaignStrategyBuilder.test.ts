@@ -18,6 +18,25 @@ describe('CampaignStrategyBuilder', () => {
     structuredContext: {},
   } as unknown as GrowthConversation);
 
+  const getStructuredCampaignConversation = (
+    channels: string[] | undefined,
+    callToAction: string | undefined,
+    turns: string[] = [],
+  ): GrowthConversation => ({
+    ...getMockConversation(turns),
+    structuredContext: {
+      campaignChannels: channels,
+      campaignCallToAction: callToAction,
+    },
+  });
+  const getDelegatedConversation =
+    (): GrowthConversation => ({
+      ...getMockConversation(),
+      structuredContext: {
+        campaignChannelRecommendationRequested:
+          true,
+      },
+    });
   const getMockObjective = (): GrowthObjective => ({
     id: 'obj1',
     tenantId: 't1',
@@ -55,6 +74,272 @@ describe('CampaignStrategyBuilder', () => {
     updatedAt: ''
   });
 
+  it('does not duplicate the product when the objective already contains it', () => {
+    const objective = {
+      ...getMockObjective(),
+      goal: 'Quiero comercializar Aura HCM',
+      productOrService: 'Aura HCM',
+    };
+
+    const strategy =
+      CampaignStrategyBuilder.buildStrategy(
+        't1',
+        'c1',
+        objective,
+        getMockBrandBrain(),
+        getMockConversation(),
+      );
+
+    expect(
+      strategy.campaignObjective.value,
+    ).toBe(
+      'Quiero comercializar Aura HCM',
+    );
+  });
+
+  it('adds the product when the objective does not already contain it', () => {
+    const objective = {
+      ...getMockObjective(),
+      goal: 'Quiero comercializar',
+      productOrService: 'Aura HCM',
+    };
+
+    const strategy =
+      CampaignStrategyBuilder.buildStrategy(
+        't1',
+        'c1',
+        objective,
+        getMockBrandBrain(),
+        getMockConversation(),
+      );
+
+    expect(
+      strategy.campaignObjective.value,
+    ).toBe(
+      'Quiero comercializar Aura HCM',
+    );
+  });
+
+  it('deduplicates the product case-insensitively', () => {
+    const objective = {
+      ...getMockObjective(),
+      goal: 'Quiero comercializar AURA HCM',
+      productOrService: 'Aura HCM',
+    };
+
+    const strategy =
+      CampaignStrategyBuilder.buildStrategy(
+        't1',
+        'c1',
+        objective,
+        getMockBrandBrain(),
+        getMockConversation(),
+      );
+
+    expect(
+      strategy.campaignObjective.value,
+    ).toBe(
+      'Quiero comercializar AURA HCM',
+    );
+  });
+  it('infers B2B channels only after explicit delegation', () => {
+    const strategy =
+      CampaignStrategyBuilder.buildStrategy(
+        't1',
+        'c1',
+        getMockObjective(),
+        getMockBrandBrain(),
+        getDelegatedConversation(),
+      );
+
+    expect(
+      strategy.recommendedChannels.status,
+    ).toBe('inferred');
+
+    expect(
+      strategy.recommendedChannels.value,
+    ).toEqual([
+      'LinkedIn',
+      'Email',
+    ]);
+
+    expect(
+      strategy.recommendedChannels.source,
+    ).toBe(
+      'Aura Growth Channel Recommendation Policy V1',
+    );
+  });
+
+  it('keeps delegated channels missing when evidence is insufficient', () => {
+    const objective = {
+      ...getMockObjective(),
+      audience: '',
+    };
+
+    const brandBrain = {
+      ...getMockBrandBrain(),
+      industry: {
+        value: null,
+        status: 'missing' as const,
+        confidence: 'low' as const,
+      },
+      targetAudience: {
+        value: null,
+        status: 'missing' as const,
+        confidence: 'low' as const,
+      },
+    };
+
+    const strategy =
+      CampaignStrategyBuilder.buildStrategy(
+        't1',
+        'c1',
+        objective,
+        brandBrain,
+        getDelegatedConversation(),
+      );
+
+    expect(
+      strategy.recommendedChannels.status,
+    ).toBe('missing');
+
+    expect(
+      strategy.recommendedChannels.value,
+    ).toBeNull();
+  });
+
+  it('preserves explicit structured channels over delegated recommendation', () => {
+    const conversation = {
+      ...getDelegatedConversation(),
+      structuredContext: {
+        campaignChannelRecommendationRequested:
+          true,
+        campaignChannels: [
+          'Google',
+        ],
+      },
+    };
+
+    const strategy =
+      CampaignStrategyBuilder.buildStrategy(
+        't1',
+        'c1',
+        getMockObjective(),
+        getMockBrandBrain(),
+        conversation,
+      );
+
+    expect(
+      strategy.recommendedChannels.status,
+    ).toBe('confirmed');
+
+    expect(
+      strategy.recommendedChannels.value,
+    ).toEqual([
+      'Google',
+    ]);
+  });
+  it('uses structured campaign channels as confirmed evidence', () => {
+    const conv =
+      getStructuredCampaignConversation(
+        ['LinkedIn', 'Email'],
+        undefined,
+        ['Texto sin canales reconocibles'],
+      );
+
+    const strategy =
+      CampaignStrategyBuilder.buildStrategy(
+        't1',
+        'c1',
+        getMockObjective(),
+        getMockBrandBrain(),
+        conv,
+      );
+
+    expect(
+      strategy.recommendedChannels.status,
+    ).toBe('confirmed');
+
+    expect(
+      strategy.recommendedChannels.value,
+    ).toEqual([
+      'LinkedIn',
+      'Email',
+    ]);
+
+    expect(
+      strategy.recommendedChannels.source,
+    ).toBe(
+      'Growth Conversation / Campaign Intake',
+    );
+  });
+
+  it('uses structured campaign CTA as confirmed evidence', () => {
+    const conv =
+      getStructuredCampaignConversation(
+        undefined,
+        'Agendar una demostración',
+      );
+
+    const strategy =
+      CampaignStrategyBuilder.buildStrategy(
+        't1',
+        'c1',
+        getMockObjective(),
+        getMockBrandBrain(),
+        conv,
+      );
+
+    expect(
+      strategy.callsToAction.status,
+    ).toBe('confirmed');
+
+    expect(
+      strategy.callsToAction.value,
+    ).toEqual([
+      'Agendar una demostración',
+    ]);
+
+    expect(
+      strategy.callsToAction.source,
+    ).toBe(
+      'Growth Conversation / Campaign Intake',
+    );
+  });
+
+  it('prioritizes structured channels over legacy turn scanning', () => {
+    const conv =
+      getStructuredCampaignConversation(
+        ['LinkedIn'],
+        undefined,
+        [
+          'Antes habíamos considerado Facebook y WhatsApp.',
+        ],
+      );
+
+    const strategy =
+      CampaignStrategyBuilder.buildStrategy(
+        't1',
+        'c1',
+        getMockObjective(),
+        getMockBrandBrain(),
+        conv,
+      );
+
+    expect(
+      strategy.recommendedChannels.value,
+    ).toEqual([
+      'LinkedIn',
+    ]);
+
+    expect(
+      strategy.recommendedChannels.value,
+    ).not.toContain('Facebook');
+
+    expect(
+      strategy.recommendedChannels.value,
+    ).not.toContain('WhatsApp');
+  });
   it('does NOT recommend channels without explicit evidence', () => {
     const conv = getMockConversation(['Solo quiero vender más, no sé dónde.']);
     const strategy = CampaignStrategyBuilder.buildStrategy('t1', 'c1', getMockObjective(), getMockBrandBrain(), conv);

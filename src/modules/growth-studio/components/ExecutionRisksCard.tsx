@@ -1,6 +1,8 @@
 import React from 'react';
 import type { ExecutionRisk, ExecutionDependency } from '../types/executiveExecutionPlan';
 import { AlertTriangle, AlertCircle, Link } from 'lucide-react';
+import { useGrowthI18n } from '../i18n/GrowthI18nProvider';
+import { presentGrowthEnum } from '../i18n/growthEnumPresentation';
 
 interface ExecutionRisksCardProps {
   risks: ExecutionRisk[];
@@ -8,6 +10,11 @@ interface ExecutionRisksCardProps {
 }
 
 export const ExecutionRisksCard: React.FC<ExecutionRisksCardProps> = ({ risks, missingDependencies }) => {
+  const { messages } =
+    useGrowthI18n();
+
+  const advisor =
+    messages.advisorPresentation;
   if (risks.length === 0 && missingDependencies.length === 0) {
     return null;
   }
@@ -46,7 +53,7 @@ export const ExecutionRisksCard: React.FC<ExecutionRisksCardProps> = ({ risks, m
                 <AlertTriangle className="text-red-400 shrink-0 mt-0.5" size={16} />
                 <div>
                   <p className="text-sm text-white font-medium">{risk.description}</p>
-                  <p className="text-xs text-white/50 mt-1 uppercase tracking-wider">{risk.severity}</p>
+                  <p className="text-xs text-white/50 mt-1 uppercase tracking-wider">{presentGrowthEnum('severity', risk.severity, advisor)}</p>
                 </div>
               </div>
             ))}

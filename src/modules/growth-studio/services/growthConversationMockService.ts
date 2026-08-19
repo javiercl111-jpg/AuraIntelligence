@@ -161,19 +161,25 @@ export class GrowthConversationMockService implements IGrowthConversationService
     switch (conv.currentStage) {
       case 'understanding_objective': {
         const userInput = lastUserTurn?.content || '';
-        const lowerInput = userInput.toLowerCase();
-        if (lowerInput.includes('vender') || lowerInput.includes('comercializar')) {
-          const productMatch = lowerInput.match(/(?:vender|comercializar)\s+(.+)/i);
-          if (productMatch && productMatch[1]) {
-            conv.structuredContext.objective = 'vender/comercializar';
-            conv.structuredContext.productOrService = userInput.substring(productMatch.index! + productMatch[0].length - productMatch[1].length).trim();
-          } else {
-            conv.structuredContext.objective = userInput;
-          }
-        } else {
-          conv.structuredContext.objective = userInput;
-        }
+        const objectiveVerbMatch =
+          userInput.match(
+            /^(.*?\b(?:vender|comercializar))\s+(.+)$/i,
+          );
 
+        if (
+          objectiveVerbMatch &&
+          objectiveVerbMatch[1] &&
+          objectiveVerbMatch[2]
+        ) {
+          conv.structuredContext.objective =
+            objectiveVerbMatch[1].trim();
+
+          conv.structuredContext.productOrService =
+            objectiveVerbMatch[2].trim();
+        } else {
+          conv.structuredContext.objective =
+            userInput;
+        }
         if (!conv.structuredContext.productOrService) {
           content = '¿Qué producto o servicio deseas impulsar?';
           nextStage = 'understanding_product';
@@ -200,7 +206,79 @@ export class GrowthConversationMockService implements IGrowthConversationService
         break;
       case 'understanding_result':
         conv.structuredContext.expectedResult = lastUserTurn?.content;
-        content = 'Gracias por la información. Aquí tienes un resumen de lo que he entendido.';
+        content =
+          '¿En qué canales o medios quieres desarrollar esta estrategia? Puedes indicar, por ejemplo, LinkedIn, Facebook, Instagram, email, sitio web u otros.';
+        nextStage = 'understanding_channels';
+        break;
+
+      case 'understanding_channels': {
+        const channelInput =
+          lastUserTurn?.content?.trim() || '';
+
+        const normalizedChannelInput =
+          channelInput
+            .toLocaleLowerCase('es')
+            .normalize('NFD')
+            .replace(
+              /[\u0300-\u036f]/g,
+              '',
+            );
+
+        const channelUncertain =
+          normalizedChannelInput ===
+            'no se' ||
+          normalizedChannelInput ===
+            'no lo se' ||
+          normalizedChannelInput ===
+            'no estoy seguro' ||
+          normalizedChannelInput ===
+            'no estoy segura' ||
+          normalizedChannelInput ===
+            'no tengo preferencia' ||
+          normalizedChannelInput ===
+            'ninguno' ||
+          normalizedChannelInput ===
+            'ninguna';
+        const recommendationRequested =
+          normalizedChannelInput ===
+            'recomiendame' ||
+          normalizedChannelInput ===
+            'aura, recomiendame' ||
+          normalizedChannelInput ===
+            'aura recomiendame' ||
+          normalizedChannelInput ===
+            'recomiendame los canales' ||
+          normalizedChannelInput ===
+            'aura, recomiendame los canales' ||
+          normalizedChannelInput ===
+            'aura recomiendame los canales';
+
+        conv.structuredContext
+          .campaignChannelRecommendationRequested =
+            recommendationRequested;
+
+        conv.structuredContext.campaignChannels =
+          recommendationRequested ||
+          channelUncertain
+            ? undefined
+            : channelInput
+                .split(/[,;]+/)
+                .map(channel =>
+                  channel.trim(),
+                )
+                .filter(Boolean);
+
+        content =
+          '¿Cuál quieres que sea el llamado a la acción principal de la campaña? Por ejemplo: agendar una conversación, solicitar una demostración, registrarse o contactar al equipo comercial.';
+        nextStage = 'understanding_cta';
+        break;
+      }
+      case 'understanding_cta':
+        conv.structuredContext.campaignCallToAction =
+          lastUserTurn?.content?.trim() || undefined;
+
+        content =
+          'Gracias por la información. Aquí tienes un resumen de lo que he entendido.';
         nextStage = 'executive_reflection';
         break;
       case 'executive_reflection': {

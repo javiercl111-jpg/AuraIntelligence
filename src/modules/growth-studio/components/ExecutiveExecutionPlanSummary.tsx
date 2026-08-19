@@ -6,12 +6,18 @@ import { NextRecommendedActionCard } from './NextRecommendedActionCard';
 import { ExecutiveExecutionPlanCard } from './ExecutiveExecutionPlanCard';
 import { ExecutionTimeline } from './ExecutionTimeline';
 import { ExecutionRisksCard } from './ExecutionRisksCard';
+import { useGrowthI18n } from '../i18n/GrowthI18nProvider';
 
 interface ExecutiveExecutionPlanSummaryProps {
   plan: ExecutiveExecutionPlan | null;
 }
 
 export const ExecutiveExecutionPlanSummary: React.FC<ExecutiveExecutionPlanSummaryProps> = ({ plan }) => {
+  const { messages } =
+    useGrowthI18n();
+
+  const advisor =
+    messages.advisorPresentation;
   if (!plan) return null;
 
   return (
@@ -26,8 +32,8 @@ export const ExecutiveExecutionPlanSummary: React.FC<ExecutiveExecutionPlanSumma
             <Play size={20} />
           </div>
           <div>
-            <h2 className="text-2xl font-black tracking-tight text-white">Executive Execution Plan™</h2>
-            <p className="text-sm font-medium text-emerald-400/80">Plan de ejecución accionable</p>
+            <h2 className="text-2xl font-black tracking-tight text-white">{advisor.executiveExecutionPlan}</h2>
+            <p className="text-sm font-medium text-emerald-400/80">{advisor.actionableExecutionPlan}</p>
           </div>
         </div>
       </header>
@@ -45,7 +51,7 @@ export const ExecutiveExecutionPlanSummary: React.FC<ExecutiveExecutionPlanSumma
 
         <div className="space-y-6">
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
-            <h3 className="font-bold text-white mb-6">Timeline Estratégico</h3>
+            <h3 className="font-bold text-white mb-6">{advisor.strategicTimeline}</h3>
             <ExecutionTimeline phases={plan.strategicPhases} />
           </div>
           <ExecutionRisksCard risks={plan.executionRisks} missingDependencies={plan.missingDependencies} />

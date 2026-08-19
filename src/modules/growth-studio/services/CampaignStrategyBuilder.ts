@@ -24,9 +24,13 @@ export class CampaignStrategyBuilder {
       secondaryAudience: this.buildField<string>('secondaryAudience', null, 'missing', undefined, undefined),
       coreMessage: this.buildCoreMessageField(brandBrain),
       valueDrivers: this.buildValueDriversField(brandBrain),
-      recommendedChannels: this.buildChannelsField(conversation),
+      recommendedChannels: this.buildChannelsField(
+        conversation,
+        objective,
+        brandBrain,
+      ),
       recommendedContentTypes: this.buildContentTypesField(conversation),
-      callsToAction: this.buildField<string[]>('callsToAction', null, 'missing', undefined, undefined),
+      callsToAction: this.buildCallsToActionField(conversation),
       assumptions: [],
       knowledgeGaps: [],
       strategyRisks: [],
@@ -55,9 +59,36 @@ export class CampaignStrategyBuilder {
 
   private static buildObjectiveField(objective: GrowthObjective | null): CampaignStrategyField<string> {
     if (objective?.goal && objective?.productOrService) {
+      const normalizedGoal =
+        objective.goal
+          .toLocaleLowerCase('es')
+          .normalize('NFD')
+          .replace(
+            /[\u0300-\u036f]/g,
+            '',
+          );
+
+      const normalizedProduct =
+        objective.productOrService
+          .toLocaleLowerCase('es')
+          .normalize('NFD')
+          .replace(
+            /[\u0300-\u036f]/g,
+            '',
+          );
+
+      const goalIncludesProduct =
+        normalizedGoal.includes(
+          normalizedProduct,
+        );
+
+      const campaignObjectiveValue =
+        goalIncludesProduct
+          ? objective.goal.trim()
+          : `${objective.goal.trim()} ${objective.productOrService.trim()}`;
       return this.buildField(
         'campaignObjective',
-        `${objective.goal} ${objective.productOrService}`,
+        campaignObjectiveValue,
         'confirmed',
         'Growth Objective',
         `Goal: ${objective.goal}, Product: ${objective.productOrService}`
@@ -90,7 +121,59 @@ export class CampaignStrategyBuilder {
     return this.buildField<string[]>('valueDrivers', null, 'missing');
   }
 
-  private static buildChannelsField(conversation: GrowthConversation | null): CampaignStrategyField<string[]> {
+  private static buildChannelsField(
+    conversation: GrowthConversation | null,
+    objective: GrowthObjective | null,
+    brandBrain: BrandBrain | null,
+  ): CampaignStrategyField<string[]> {
+    const structuredChannels =
+      conversation?.structuredContext
+        ?.campaignChannels
+        ?.map(channel => channel.trim())
+        .filter(Boolean);
+
+    if (
+      structuredChannels &&
+      structuredChannels.length > 0
+    ) {
+      return this.buildField(
+        'recommendedChannels',
+        structuredChannels,
+        'confirmed',
+        'Growth Conversation / Campaign Intake',
+        structuredChannels.join(', '),
+      );
+    }
+    const recommendationRequested =
+      conversation?.structuredContext
+        ?.campaignChannelRecommendationRequested ===
+      true;
+
+    if (recommendationRequested) {
+      const recommendation =
+        this.recommendDelegatedChannels(
+          objective,
+          brandBrain,
+        );
+
+      if (recommendation) {
+        return this.buildField(
+          'recommendedChannels',
+          recommendation.channels,
+          'inferred',
+          'Aura Growth Channel Recommendation Policy V1',
+          recommendation.evidence,
+        );
+      }
+
+      return this.buildField<string[]>(
+        'recommendedChannels',
+        null,
+        'missing',
+        'Aura Growth Channel Recommendation Policy V1',
+        'Explicit recommendation delegation was provided, but available evidence was insufficient for a supported channel recommendation.',
+      );
+    }
     // We explicitly do not assume any channels without evidence.
     // Let's check conversation for explicit channel mentions.
     const explicitChannels: string[] = [];
@@ -116,6 +199,136 @@ export class CampaignStrategyBuilder {
     return this.buildField<string[]>('recommendedChannels', null, 'missing');
   }
 
+  private static recommendDelegatedChannels(
+    objective: GrowthObjective | null,
+    brandBrain: BrandBrain | null,
+  ): {
+    channels: string[];
+    evidence: string;
+  } | null {
+    const objectiveAudience =
+      objective?.audience?.trim() || '';
+
+    const brandAudience =
+      brandBrain?.targetAudience?.value?.trim() ||
+      '';
+
+    const industry =
+      brandBrain?.industry?.value?.trim() || '';
+
+    const evidenceText = [
+      objectiveAudience,
+      brandAudience,
+      industry,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLocaleLowerCase('es')
+      .normalize('NFD')
+      .replace(
+        /[\u0300-\u036f]/g,
+        '',
+      );
+
+    if (!evidenceText) {
+      return null;
+    }
+
+    const b2bSignals = [
+      'b2b',
+      'empresa',
+      'empresas',
+      'empresarial',
+      'corporativo',
+      'corporativa',
+      'negocio',
+      'negocios',
+      'hotel',
+      'hoteles',
+      'restaurante',
+      'restaurantes',
+      'pyme',
+      'pymes',
+    ];
+
+    if (
+      b2bSignals.some(signal =>
+        evidenceText.includes(signal),
+      )
+    ) {
+      return {
+        channels: [
+          'LinkedIn',
+          'Email',
+        ],
+        evidence:
+          `Delegated recommendation supported by business-audience evidence: ${[
+            objectiveAudience,
+            brandAudience,
+            industry,
+          ]
+            .filter(Boolean)
+            .join(' | ')}`,
+      };
+    }
+
+    const consumerSignals = [
+      'b2c',
+      'consumidor',
+      'consumidores',
+      'cliente final',
+      'clientes finales',
+      'publico general',
+      'personas',
+    ];
+
+    if (
+      consumerSignals.some(signal =>
+        evidenceText.includes(signal),
+      )
+    ) {
+      return {
+        channels: [
+          'Instagram',
+          'Facebook',
+        ],
+        evidence:
+          `Delegated recommendation supported by consumer-audience evidence: ${[
+            objectiveAudience,
+            brandAudience,
+            industry,
+          ]
+            .filter(Boolean)
+            .join(' | ')}`,
+      };
+    }
+
+    return null;
+  }
+  private static buildCallsToActionField(
+    conversation: GrowthConversation | null,
+  ): CampaignStrategyField<string[]> {
+    const structuredCallToAction =
+      conversation?.structuredContext
+        ?.campaignCallToAction
+        ?.trim();
+
+    if (structuredCallToAction) {
+      return this.buildField(
+        'callsToAction',
+        [structuredCallToAction],
+        'confirmed',
+        'Growth Conversation / Campaign Intake',
+        structuredCallToAction,
+      );
+    }
+
+    return this.buildField<string[]>(
+      'callsToAction',
+      null,
+      'missing',
+    );
+  }
   private static buildContentTypesField(conversation: GrowthConversation | null): CampaignStrategyField<string[]> {
     const explicitTypes: string[] = [];
     let evidence = '';

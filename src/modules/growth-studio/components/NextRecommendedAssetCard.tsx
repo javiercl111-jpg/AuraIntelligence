@@ -1,11 +1,18 @@
 import React from 'react';
 import type { ContentAsset } from '../types/contentPlan';
+import { useGrowthI18n } from '../i18n/GrowthI18nProvider';
+import { presentGrowthEnum } from '../i18n/growthEnumPresentation';
 
 interface NextRecommendedAssetCardProps {
   asset: ContentAsset | null;
 }
 
 export const NextRecommendedAssetCard: React.FC<NextRecommendedAssetCardProps> = ({ asset }) => {
+  const { messages } =
+    useGrowthI18n();
+
+  const advisor =
+    messages.advisorPresentation;
   if (!asset) {
     return (
       <div className="bg-slate-50 p-4 border border-slate-200 rounded-xl mb-6">
@@ -29,7 +36,7 @@ export const NextRecommendedAssetCard: React.FC<NextRecommendedAssetCardProps> =
         <div className="flex justify-between items-start mb-1">
           <span className="font-semibold text-slate-800 text-sm">{asset.title}</span>
           <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-blue-100 text-blue-800 tracking-wider">
-            Prioridad: {asset.priority}
+            Prioridad: {presentGrowthEnum('priority', asset.priority, advisor)}
           </span>
         </div>
         <p className="text-xs text-slate-600 mb-2">{asset.purpose}</p>

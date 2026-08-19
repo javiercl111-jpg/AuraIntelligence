@@ -25,6 +25,8 @@ export type GrowthConversationStage =
   | 'understanding_audience'
   | 'understanding_region'
   | 'understanding_result'
+  | 'understanding_channels'
+  | 'understanding_cta'
   | 'executive_reflection'
   | 'executive_proposal'
   | 'approval'
@@ -62,6 +64,17 @@ export interface GrowthStructuredContext {
   productOrService?: string;
 
   /** Any additional key-value data extracted by AI. */
+  /** Explicit campaign channel preferences captured from the user. */
+  campaignChannels?: string[];
+  /**
+   * Explicit authorization for Aura to recommend campaign channels.
+   * This is not equivalent to uncertainty such as "no sé".
+   */
+  campaignChannelRecommendationRequested?: boolean;
+
+  /** Explicit campaign call-to-action preference captured from the user. */
+  campaignCallToAction?: string;
+
   additionalData?: Record<string, unknown>;
 }
 
@@ -139,4 +152,3 @@ export interface GrowthConversationTurn {
   /** ISO 8601 creation timestamp. */
   readonly createdAt: string;
 }
-
