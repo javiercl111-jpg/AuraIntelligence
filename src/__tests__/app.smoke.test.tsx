@@ -144,7 +144,9 @@ describe('App — Integration Smoke Tests', () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText('Crecimiento Ejecutivo')).toBeInTheDocument();
+      expect(
+        document.querySelector('#growth-studio-entry'),
+      ).toBeInTheDocument();
     });
   });
 });
