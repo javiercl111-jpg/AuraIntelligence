@@ -120,7 +120,7 @@ const App: React.FC = () => {
         await seedDefaultArticles();
       } catch (error) {
         console.error(
-          '[Aura Intelligence] Error al sembrar los artículos de conocimiento por defecto:',
+          '[Aura Intelligence] Error al sembrar los artÃ­culos de conocimiento por defecto:',
           error,
         );
       }
@@ -133,6 +133,29 @@ const App: React.FC = () => {
     await signOut(auth);
   };
 
+  if (productSurface === 'invalid') {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#07111f] px-6 text-white">
+        <section className="w-full max-w-xl rounded-3xl border border-red-400/20 bg-white/[0.035] p-8 text-center shadow-2xl shadow-black/30 backdrop-blur-xl">
+          <p className="text-xs font-black uppercase tracking-[0.3em] text-red-300">
+            Aura Nexus
+          </p>
+
+          <h1 className="mt-4 text-2xl font-black tracking-tight">
+            Configuración de producto no válida
+          </h1>
+
+          <p className="mt-4 text-sm leading-6 text-white/55">
+            Esta dirección no está autorizada para abrir una superficie de producto Aura.
+          </p>
+
+          <p className="mt-2 text-sm leading-6 text-white/40">
+            Verifica el dominio de acceso o contacta al administrador de tu organización.
+          </p>
+        </section>
+      </main>
+    );
+  }
   if (!isAuthReady) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#07111f] text-white">
@@ -172,7 +195,7 @@ const App: React.FC = () => {
             }
             className="rounded-xl border border-white/10 bg-[#07111f]/85 px-4 py-2 text-xs font-bold text-white/55 shadow-lg backdrop-blur-md transition hover:border-cyan-300/20 hover:text-cyan-200"
           >
-            Cerrar sesión
+            Cerrar sesiÃ³n
           </button>
         </div>
 
@@ -219,7 +242,7 @@ const App: React.FC = () => {
             }
             className="rounded-xl border border-white/10 px-4 py-2 text-xs font-bold text-white/70 transition hover:bg-white/10 hover:text-white"
           >
-            Cerrar sesión
+            Cerrar sesiÃ³n
           </button>
         </div>
       </section>
