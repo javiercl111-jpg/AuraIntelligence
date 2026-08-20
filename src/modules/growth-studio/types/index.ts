@@ -156,3 +156,4 @@ export type {
 } from './executiveReviewReport';
 
 export default {};
+export * from './growthOpportunity';
