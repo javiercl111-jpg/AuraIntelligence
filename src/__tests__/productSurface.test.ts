@@ -1,4 +1,4 @@
-import {
+﻿import {
   describe,
   expect,
   it,
@@ -6,45 +6,144 @@ import {
 
 import {
   resolveDevelopmentProductSurface,
+  resolveProductSurfaceAuthority,
 } from '../productSurface';
 
 describe(
-  'development product surface resolver',
+  'product surface authority resolver',
   () => {
-    it('selects Growth only for the explicit growth value', () => {
+    it('selects Growth for explicit Growth in development', () => {
       expect(
-        resolveDevelopmentProductSurface('growth'),
+        resolveDevelopmentProductSurface(
+          'growth',
+        ),
       ).toBe('growth');
     });
 
-    it('fails closed to Intelligence for undefined configuration', () => {
+    it('selects Intelligence for explicit Intelligence in development', () => {
       expect(
-        resolveDevelopmentProductSurface(undefined),
+        resolveDevelopmentProductSurface(
+          'intelligence',
+        ),
       ).toBe('intelligence');
     });
 
-    it('does not treat feature-like boolean values as Growth authority', () => {
+    it('fails closed for missing development configuration', () => {
       expect(
-        resolveDevelopmentProductSurface(true),
-      ).toBe('intelligence');
+        resolveDevelopmentProductSurface(
+          undefined,
+        ),
+      ).toBe('invalid');
+    });
+
+    it('fails closed for boolean and arbitrary development configuration', () => {
+      expect(
+        resolveDevelopmentProductSurface(
+          true,
+        ),
+      ).toBe('invalid');
 
       expect(
-        resolveDevelopmentProductSurface(false),
+        resolveDevelopmentProductSurface(
+          false,
+        ),
+      ).toBe('invalid');
+
+      expect(
+        resolveDevelopmentProductSurface(
+          'AURA_GROWTH',
+        ),
+      ).toBe('invalid');
+
+      expect(
+        resolveDevelopmentProductSurface(
+          'admin',
+        ),
+      ).toBe('invalid');
+
+      expect(
+        resolveDevelopmentProductSurface(
+          'true',
+        ),
+      ).toBe('invalid');
+    });
+
+    it('allows Growth only on the Growth production hostname', () => {
+      expect(
+        resolveProductSurfaceAuthority({
+          configuredSurface: 'growth',
+          hostname:
+            'growth.auranexus.io',
+          isDevelopment: false,
+        }),
+      ).toBe('growth');
+    });
+
+    it('allows Intelligence only on the Intelligence production hostname', () => {
+      expect(
+        resolveProductSurfaceAuthority({
+          configuredSurface:
+            'intelligence',
+          hostname:
+            'intelligence.auranexus.io',
+          isDevelopment: false,
+        }),
       ).toBe('intelligence');
     });
 
-    it('does not accept arbitrary product values', () => {
+    it('fails closed when Growth configuration is served from the Intelligence hostname', () => {
       expect(
-        resolveDevelopmentProductSurface('AURA_GROWTH'),
-      ).toBe('intelligence');
+        resolveProductSurfaceAuthority({
+          configuredSurface: 'growth',
+          hostname:
+            'intelligence.auranexus.io',
+          isDevelopment: false,
+        }),
+      ).toBe('invalid');
+    });
+
+    it('fails closed when Intelligence configuration is served from the Growth hostname', () => {
+      expect(
+        resolveProductSurfaceAuthority({
+          configuredSurface:
+            'intelligence',
+          hostname:
+            'growth.auranexus.io',
+          isDevelopment: false,
+        }),
+      ).toBe('invalid');
+    });
+
+    it('fails closed for unknown production hostnames', () => {
+      expect(
+        resolveProductSurfaceAuthority({
+          configuredSurface: 'growth',
+          hostname:
+            'example.com',
+          isDevelopment: false,
+        }),
+      ).toBe('invalid');
 
       expect(
-        resolveDevelopmentProductSurface('admin'),
-      ).toBe('intelligence');
+        resolveProductSurfaceAuthority({
+          configuredSurface:
+            'intelligence',
+          hostname:
+            'example.com',
+          isDevelopment: false,
+        }),
+      ).toBe('invalid');
+    });
 
+    it('normalizes production hostname casing and whitespace', () => {
       expect(
-        resolveDevelopmentProductSurface('true'),
-      ).toBe('intelligence');
+        resolveProductSurfaceAuthority({
+          configuredSurface: 'growth',
+          hostname:
+            '  GROWTH.AURANEXUS.IO  ',
+          isDevelopment: false,
+        }),
+      ).toBe('growth');
     });
   },
 );
