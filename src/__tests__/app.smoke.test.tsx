@@ -60,6 +60,32 @@ vi.mock('../services/featureFlagService', () => ({
   },
 }));
 
+// AGFC01_01A_GROWTH_APP_SMOKE_FIXTURE
+// This file validates the Growth application surface explicitly.
+// Product-domain authority itself is covered by productSurface tests.
+vi.mock('../productSurface', () => ({
+  getDevelopmentProductSurface: () => 'growth',
+}));
+
+// App smoke must not depend on a live Firestore company lookup.
+// Dedicated connector tests own that integration contract.
+vi.mock('../services/auraHCMConnectorService', () => ({
+  buildAuraHCMConnectorContext: vi.fn(async () => ({
+    employee: {
+      companyId: 'company-aura',
+      displayName: 'Growth Test User',
+    },
+    profile: null,
+    permissions: {},
+    company: {
+      companyId: 'company-aura',
+      name: 'Aura Nexus',
+      aiEnabled: true,
+      modulesEnabled: [],
+      features: {},
+    },
+  })),
+}));
 describe('App — Integration Smoke Tests', () => {
   beforeEach(() => {
     mockFlagValue.current = false;

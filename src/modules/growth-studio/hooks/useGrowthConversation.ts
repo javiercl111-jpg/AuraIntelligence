@@ -3,11 +3,12 @@
 // ─────────────────────────────────────────────────────────────
 
 import { useState, useCallback } from 'react';
+import type { AuraIntelligenceContext } from '../../../types/auraIntelligence';
 import type { GrowthConversation, GrowthConversationTurn } from '../types/growthConversation';
 import type { GrowthObjective } from '../types/growthObjective';
 import type { BrandBrain } from '../types/brandBrain';
 import type { CampaignStrategy } from '../types/campaignStrategy';
-import { growthConversationService } from '../services/growthConversationMockService';
+import { growthConversationService } from '../services/growthConversationProductionService';
 import { growthObjectiveService } from '../services/growthObjectiveMockService';
 import { brandBrainMockService } from '../services/brandBrainMockService';
 import { campaignStrategyMockService } from '../services/campaignStrategyMockService';
@@ -18,7 +19,32 @@ import { contentPlanMockService } from '../services/contentPlanMockService';
 import type { ExecutiveContentBrief } from '../types/executiveContentBrief';
 import { executiveContentBriefMockService } from '../services/executiveContentBriefMockService';
 
-export const useGrowthConversation = () => {
+interface GrowthConversationRuntimeOptions {
+  readonly context?: AuraIntelligenceContext;
+  readonly companyName?: string;
+}
+
+export const useGrowthConversation = (
+  options: GrowthConversationRuntimeOptions = {},
+) => {
+  const {
+    context,
+    companyName,
+  } = options;
+
+  const hasRuntimeIdentity =
+    Boolean(
+      companyName?.trim() ||
+      (
+        context?.userName?.trim() &&
+        context.userName !== 'Administrador Aura' &&
+        !context.userName.includes('@')
+      ) ||
+      (
+        context?.userEmail?.trim() &&
+        context.userEmail !== 'admin@aura.demo'
+      )
+    );
   const [conversation, setConversation] = useState<GrowthConversation | null>(null);
   const [turns, setTurns] = useState<GrowthConversationTurn[]>([]);
   const [objective, setObjective] = useState<GrowthObjective | null>(null);
@@ -31,25 +57,142 @@ export const useGrowthConversation = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const contextualizeTurns =
+    useCallback(
+      (
+        sourceTurns: GrowthConversationTurn[],
+      ): GrowthConversationTurn[] => {
+        if (!hasRuntimeIdentity) {
+          return sourceTurns;
+        }
+
+        const rawUserName =
+          context?.userName?.trim() ||
+          '';
+
+        const resolvedUserName =
+          rawUserName &&
+          rawUserName !== 'Administrador Aura' &&
+          !rawUserName.includes('@')
+            ? rawUserName
+            : '';
+
+        const resolvedCompanyName =
+          companyName?.trim() ||
+          '';
+
+        return sourceTurns.map(
+          (turn, index) => {
+            if (
+              index !== 0 ||
+              turn.role !== 'assistant'
+            ) {
+              return turn;
+            }
+
+            const greeting =
+              resolvedUserName
+                ? `Hola, ${resolvedUserName}.`
+                : 'Hola.';
+
+            const companyContext =
+              resolvedCompanyName
+                ? ` Ya tengo identificado el contexto de ${resolvedCompanyName}.`
+                : '';
+
+            return {
+              ...turn,
+              content:
+                `${greeting}${companyContext} Voy a utilizar ese contexto y preguntarte sólo lo que falte para completar la estrategia. Para esta iniciativa, ¿qué objetivo específico quieres alcanzar?`,
+            };
+          },
+        );
+      },
+      [
+        companyName,
+        context?.companyId,
+        context?.userName,
+        hasRuntimeIdentity,
+      ],
+    );
+
   const start = useCallback(async () => {
     setIsTyping(true);
     setError(null);
     try {
       const conv = await growthConversationService.startConversation({
-        tenantId: 'growth_demo_tenant',
-        companyId: 'growth_demo_company',
-        userId: 'growth_demo_user',
+        tenantId:
+          context?.tenantId ||
+          'growth_demo_tenant',
+        companyId:
+          context?.companyId ||
+          'growth_demo_company',
+        userId:
+          context?.userId ||
+          'growth_demo_user',
       });
+
+      if (hasRuntimeIdentity) {
+        Object.assign(conv.structuredContext, {
+          ...conv.structuredContext,
+          additionalData: {
+            ...(
+              conv.structuredContext
+                .additionalData ||
+              {}
+            ),
+            tenantId:
+              context?.tenantId,
+            companyId:
+              context?.companyId,
+            companyName:
+              companyName?.trim() ||
+              undefined,
+            userName:
+              context?.userName?.trim() ||
+              undefined,
+            userEmail:
+              context?.userEmail?.trim() ||
+              undefined,
+          },
+        });
+      }
+
       setConversation(conv);
-      const convTurns = await growthConversationService.getConversationTurns(conv.id);
-      setTurns(convTurns);
+
+      if (hasRuntimeIdentity) {
+        const initialBrain =
+          await brandBrainMockService.buildBrandBrain(
+            conv.id,
+            conv.structuredContext,
+          );
+
+        setBrandBrain(initialBrain);
+      }
+
+      const convTurns =
+        await growthConversationService
+          .getConversationTurns(
+            conv.id,
+          );
+
+      setTurns(
+        contextualizeTurns(
+          convTurns,
+        ),
+      );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al iniciar la conversación');
     } finally {
       setIsTyping(false);
       setLoading(false);
     }
-  }, []);
+  }, [
+    companyName,
+    context,
+    contextualizeTurns,
+    hasRuntimeIdentity,
+  ]);
 
   const addTurn = useCallback(async (content: string) => {
     if (!conversation) return;
@@ -69,14 +212,14 @@ export const useGrowthConversation = () => {
 
       // Update UI with user turn immediately
       let updatedTurns = await growthConversationService.getConversationTurns(conversation.id);
-      setTurns(updatedTurns);
+      setTurns(contextualizeTurns(updatedTurns));
 
       // 2. Generate assistant response
       await growthConversationService.generateAssistantResponse(conversation.id);
 
       // Update UI with assistant turn and new conversation state
       updatedTurns = await growthConversationService.getConversationTurns(conversation.id);
-      setTurns(updatedTurns);
+      setTurns(contextualizeTurns(updatedTurns));
 
       const updatedConv = await growthConversationService.getConversation(conversation.id);
       if (updatedConv) {
@@ -147,7 +290,11 @@ export const useGrowthConversation = () => {
     } finally {
       setIsTyping(false);
     }
-  }, [conversation, isTyping]);
+  }, [
+    conversation,
+    contextualizeTurns,
+    isTyping,
+  ]);
 
   return {
     conversation,

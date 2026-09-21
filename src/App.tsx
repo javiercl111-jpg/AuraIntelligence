@@ -15,6 +15,10 @@ import type {
 } from './types/auraIntelligence';
 
 import {
+  buildAuraHCMConnectorContext,
+} from './services/auraHCMConnectorService';
+
+import {
   seedDefaultArticles,
 } from './services/auraKnowledgeAdminService';
 
@@ -85,22 +89,98 @@ const App: React.FC = () => {
     buildDemoContext(),
   );
 
+  const [
+    growthCompanyName,
+    setGrowthCompanyName,
+  ] = useState<string | null>(null);
+
   useEffect(() => {
     const unsubscribe =
       onAuthStateChanged(
         auth,
-        (firebaseUser) => {
+        async (firebaseUser) => {
           setIsAuthenticated(
             Boolean(firebaseUser),
           );
 
+          const nextContext =
+            buildDemoContext(
+              firebaseUser?.email ||
+                null,
+            );
+
+          if (
+            isGrowthSurface &&
+            firebaseUser
+          ) {
+            const authenticatedContext = {
+              ...nextContext,
+              userId: firebaseUser.uid,
+              userEmail:
+                firebaseUser.email ||
+                nextContext.userEmail,
+              userName:
+                firebaseUser.displayName ||
+                nextContext.userName,
+            };
+
+            setContext(
+              authenticatedContext,
+            );
+
+            try {
+              const connectorContext =
+                await buildAuraHCMConnectorContext({
+                  userEmail:
+                    firebaseUser.email ||
+                    undefined,
+                });
+
+              const resolvedCompanyId =
+                connectorContext.company?.companyId ||
+                connectorContext.employee?.companyId ||
+                authenticatedContext.companyId;
+
+              setGrowthCompanyName(
+                connectorContext.company?.name ||
+                  null,
+              );
+
+              setContext({
+                ...authenticatedContext,
+                tenantId:
+                  resolvedCompanyId,
+                companyId:
+                  resolvedCompanyId,
+                userName:
+                  connectorContext.employee?.displayName ||
+                  authenticatedContext.userName,
+              });
+            } catch (error) {
+              setGrowthCompanyName(null);
+
+              console.error(
+                '[Aura Growth] Error loading company context:',
+                error,
+              );
+            }
+          }
+
           if (!isGrowthSurface) {
             setContext(
-              buildDemoContext(
-                firebaseUser?.email ||
-                  null,
-              ),
+              nextContext,
             );
+          }
+
+          if (
+            isGrowthSurface &&
+            !firebaseUser
+          ) {
+            setContext(
+              nextContext,
+            );
+
+            setGrowthCompanyName(null);
           }
 
           setIsAuthReady(true);
@@ -199,7 +279,13 @@ const App: React.FC = () => {
           </button>
         </div>
 
-        <GrowthStudioEntry />
+        <GrowthStudioEntry
+          context={context}
+          companyName={
+            growthCompanyName ||
+            undefined
+          }
+        />
       </main>
     );
   }

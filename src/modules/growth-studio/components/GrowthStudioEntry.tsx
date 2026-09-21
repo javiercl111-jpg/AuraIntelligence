@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
 
+import type {
+  AuraIntelligenceContext,
+} from '../../../types/auraIntelligence';
+
 import {
   GrowthI18nProvider,
 } from '../i18n/GrowthI18nProvider';
@@ -11,12 +15,24 @@ import ExecutiveConversationPage from './ExecutiveConversationPage';
 import GrowthExecutiveOverview from '../product/GrowthExecutiveOverview';
 import GrowthOpportunitiesWorkspace from '../product/GrowthOpportunitiesWorkspace';
 import GrowthCampaignsWorkspace from '../product/GrowthCampaignsWorkspace';
+import GrowthSettingsWorkspace from '../product/GrowthSettingsWorkspace';
+import GrowthContentExecutionWorkspace from '../product/GrowthContentExecutionWorkspace';
 
 import GrowthProductShell, {
   type GrowthProductSection,
 } from '../product/GrowthProductShell';
 
-export const GrowthStudioEntry: React.FC = () => {
+interface GrowthStudioEntryProps {
+  readonly context?: AuraIntelligenceContext;
+  readonly companyName?: string;
+}
+
+export const GrowthStudioEntry: React.FC<
+  GrowthStudioEntryProps
+> = ({
+  context,
+  companyName,
+}) => {
   const [activeSection, setActiveSection] =
     useState<GrowthProductSection>('overview');
 
@@ -28,7 +44,10 @@ export const GrowthStudioEntry: React.FC = () => {
 
   return (
     <GrowthI18nProvider>
-      <GrowthRuntimeProvider>
+      <GrowthRuntimeProvider
+        context={context}
+        companyName={companyName}
+      >
         <div id="growth-studio-entry">
         <GrowthProductShell
         activeSection={activeSection}
@@ -59,6 +78,22 @@ export const GrowthStudioEntry: React.FC = () => {
             onOpenAdvisor={() =>
               openSection('advisor')
             }
+          />
+        )}
+        {activeSection === 'content' && (
+          <GrowthContentExecutionWorkspace
+            onOpenAdvisor={() =>
+              openSection('advisor')
+            }
+            onOpenCampaigns={() =>
+              openSection('campaigns')
+            }
+          />
+        )}
+        {activeSection === 'settings' && (
+          <GrowthSettingsWorkspace
+            context={context}
+            companyName={companyName}
           />
         )}
         {activeSection === 'advisor' && (

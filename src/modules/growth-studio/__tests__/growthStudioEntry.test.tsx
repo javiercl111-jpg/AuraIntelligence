@@ -12,6 +12,14 @@ import {
 } from 'vitest';
 
 import GrowthStudioEntry from '../components/GrowthStudioEntry';
+// AGFC01_GROWTH_STUDIO_ENTRY_FIREBASE_TEST_ISOLATION
+// Unit test must not bootstrap the real Firebase application.
+vi.mock('../../../firebase', () => ({
+  auth: {
+    currentUser: null,
+  },
+}));
+
 
 vi.mock(
   '../components/ExecutiveConversationPage',
@@ -35,6 +43,39 @@ vi.mock(
   }),
 );
 
+// AGFC01_GROWTH_BRAND_BRAIN_PERSISTENCE_TEST_ISOLATION
+// GrowthStudioEntry unit tests do not exercise live Firebase persistence.
+vi.mock(
+  '../services/growthBrandBrainPersistenceService',
+  () => ({
+    growthBrandBrainPersistenceService: {
+      getProfile: vi.fn(async () => null),
+      saveProfile: vi.fn(),
+    },
+    isPersistableGrowthCompanyId: vi.fn(() => false),
+  }),
+);
+// AGFC01_GROWTH_SOCIAL_CHANNELS_TEST_ISOLATION
+// GrowthStudioEntry unit tests do not exercise the real social bridge or Firebase Auth.
+vi.mock(
+  '../services/growthSocialChannelsService',
+  () => ({
+    growthSocialChannelsService: {
+      listProfiles:
+        vi.fn(
+          async () =>
+            [],
+        ),
+      upsertProfile:
+        vi.fn(),
+    },
+    isGrowthSocialBridgeConfigured:
+      vi.fn(
+        () =>
+          false,
+      ),
+  }),
+);
 describe('GrowthStudioEntry', () => {
   it('renders Aura Growth with Executive Overview by default', () => {
     const { container } = render(

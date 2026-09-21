@@ -151,9 +151,41 @@ export class BrandBrainBuilder {
       };
     };
 
+    const runtimeCompanyName =
+      typeof context.additionalData?.companyName === 'string'
+        ? context.additionalData.companyName.trim()
+        : '';
+
+    const runtimeBusinessDescription =
+      typeof context.additionalData?.businessDescription === 'string'
+        ? context.additionalData.businessDescription.trim()
+        : '';
+
     const companyProfile: CompanyProfile = {
-      companyName: mergeField<string>('companyProfile.companyName', existingBrain?.companyProfile?.companyName, null, true),
-      businessDescription: mergeField<string>('companyProfile.businessDescription', existingBrain?.companyProfile?.businessDescription, null, true)
+      companyName: mergeField<string>(
+        'companyProfile.companyName',
+        existingBrain?.companyProfile?.companyName,
+        runtimeCompanyName || null,
+        true,
+        runtimeCompanyName
+          ? 'runtime_company_context'
+          : undefined,
+        runtimeCompanyName
+          ? `Contexto empresarial: ${runtimeCompanyName}`
+          : undefined,
+      ),
+      businessDescription: mergeField<string>(
+        'companyProfile.businessDescription',
+        existingBrain?.companyProfile?.businessDescription,
+        runtimeBusinessDescription || null,
+        true,
+        runtimeBusinessDescription
+          ? 'runtime_company_context'
+          : undefined,
+        runtimeBusinessDescription
+          ? 'Descripción empresarial obtenida del contexto de Growth.'
+          : undefined,
+      ),
     };
 
     let industryValue = existingBrain?.industry?.value || null;
