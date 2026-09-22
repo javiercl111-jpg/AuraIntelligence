@@ -184,6 +184,13 @@ implements FirestoreReceiptTransactionV1 {
     reference:
       FirestoreReceiptDocumentReferenceV1,
   ): Promise<FirestoreReceiptDocumentSnapshotV1> {
+    if (
+      this.owner.beforeGet !==
+      undefined
+    ) {
+      await this.owner.beforeGet();
+    }
+
     return new FakeSnapshot(
       this.owner.read(
         reference.id,
@@ -261,6 +268,10 @@ implements FirestoreReceiptClientV1 {
 
   transactionCount =
     0;
+
+  beforeGet:
+    (() => void | Promise<void>) |
+    undefined;
 
   collection(
     path: string,
@@ -577,6 +588,71 @@ test(
 );
 
 test(
+  "lease expiry during the transactional read transitions to outcome unknown",
+  async () => {
+    const firestore =
+      new FakeReceiptFirestore();
+
+    let nowMs =
+      Date.parse(
+        "2026-09-21T20:00:00.000Z",
+      );
+
+    const store =
+      new FirestoreTalentReceiptStoreV1(
+        firestore,
+        () => new Date(nowMs),
+        () => RESERVATION_ID,
+      );
+
+    const input =
+      context();
+
+    const first =
+      await store.reserve(
+        input,
+      );
+
+    assert.equal(
+      first.kind,
+      "RESERVED_OWNER",
+    );
+
+    firestore.beforeGet =
+      () => {
+        nowMs +=
+          TALENT_RECEIPT_LEASE_MS_V1 +
+          1;
+
+        firestore.beforeGet =
+          undefined;
+      };
+
+    const expired =
+      await store.reserve(
+        input,
+      );
+
+    assert.equal(
+      expired.kind,
+      "OUTCOME_UNKNOWN",
+    );
+
+    const identity =
+      buildTalentReceiptIdentityV1(
+        input,
+      );
+
+    assert.equal(
+      firestore.read(
+        identity.documentId,
+      )?.state,
+      "OUTCOME_UNKNOWN",
+    );
+  },
+);
+
+test(
   "same idempotency key with changed request or tenant binding is conflict",
   async () => {
     const firestore =
@@ -788,6 +864,157 @@ test(
     );
   },
 );
+test(
+  "corrupt leaseExpiresAt or expiresAt relationships fail closed without overwrite",
+  async () => {
+    for (
+      const field of [
+        "leaseExpiresAt",
+        "expiresAt",
+      ] as const
+    ) {
+      const firestore =
+        new FakeReceiptFirestore();
+
+      const store =
+        new FirestoreTalentReceiptStoreV1(
+          firestore,
+          () =>
+            new Date(
+              "2026-09-21T20:00:00.000Z",
+            ),
+          () => RESERVATION_ID,
+        );
+
+      const input =
+        context();
+
+      await store.reserve(
+        input,
+      );
+
+      const identity =
+        buildTalentReceiptIdentityV1(
+          input,
+        );
+
+      const valid =
+        firestore.read(
+          identity.documentId,
+        );
+
+      assert.ok(valid);
+
+      const originalDate =
+        valid[field];
+
+      assert.ok(
+        originalDate instanceof Date,
+      );
+
+      firestore.write(
+        identity.documentId,
+        {
+          ...valid,
+          [field]:
+            new Date(
+              originalDate.getTime() +
+              1,
+            ),
+        },
+      );
+
+      const corrupt =
+        firestore.read(
+          identity.documentId,
+        );
+
+      assert.ok(corrupt);
+
+      await assert.rejects(
+        async () => store.reserve(
+          input,
+        ),
+        TalentReceiptInvariantErrorV1,
+      );
+
+      assert.deepEqual(
+        firestore.read(
+          identity.documentId,
+        ),
+        corrupt,
+      );
+    }
+  },
+);
+
+test(
+  "persisted corrupt correlationId fails closed without overwrite",
+  async () => {
+    const firestore =
+      new FakeReceiptFirestore();
+
+    const store =
+      new FirestoreTalentReceiptStoreV1(
+        firestore,
+        () =>
+          new Date(
+            "2026-09-21T20:00:00.000Z",
+          ),
+        () => RESERVATION_ID,
+      );
+
+    const input =
+      context();
+
+    await store.reserve(
+      input,
+    );
+
+    const identity =
+      buildTalentReceiptIdentityV1(
+        input,
+      );
+
+    const valid =
+      firestore.read(
+        identity.documentId,
+      );
+
+    assert.ok(valid);
+
+    firestore.write(
+      identity.documentId,
+      {
+        ...valid,
+        correlationId:
+          "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      },
+    );
+
+    const corrupt =
+      firestore.read(
+        identity.documentId,
+      );
+
+    assert.ok(corrupt);
+
+    await assert.rejects(
+      async () => store.reserve(
+        input,
+      ),
+      TalentReceiptInvariantErrorV1,
+    );
+
+    assert.deepEqual(
+      firestore.read(
+        identity.documentId,
+      ),
+      corrupt,
+    );
+  },
+);
+
 test(
   "finalize rejects every non-F1D terminal outcome before another transaction",
   async () => {

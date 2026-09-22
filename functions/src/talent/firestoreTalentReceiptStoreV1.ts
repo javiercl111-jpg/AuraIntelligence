@@ -4,6 +4,8 @@ import { getServerFirestoreV1 } from "../firebaseAdmin.js";
 import {
   TALENT_RECEIPT_COLLECTION_V1,
   TALENT_RECEIPT_FINGERPRINT_ALGORITHM_V1,
+  TALENT_RECEIPT_LEASE_MS_V1,
+  TALENT_RECEIPT_RETENTION_MS_V1,
   TalentReceiptInvariantErrorV1,
   buildTalentReceiptIdentityV1,
   createTalentReservedReceiptV1,
@@ -376,6 +378,26 @@ function parseReceiptV1(
     );
 
   if (
+    leaseExpiresAt.getTime() !==
+    createdAt.getTime() +
+      TALENT_RECEIPT_LEASE_MS_V1
+  ) {
+    return invariant(
+      "Receipt lease duration is invalid.",
+    );
+  }
+
+  if (
+    expiresAt.getTime() !==
+    createdAt.getTime() +
+      TALENT_RECEIPT_RETENTION_MS_V1
+  ) {
+    return invariant(
+      "Receipt retention duration is invalid.",
+    );
+  }
+
+  if (
     state === "FINALIZED"
   ) {
     const terminalHttpStatus =
@@ -527,11 +549,6 @@ implements TalentReceiptStoreV1 {
           identity.documentId,
         );
 
-    const now =
-      cloneDate(
-        this.nowProvider(),
-      );
-
     const reservationId =
       this.reservationIdFactory();
 
@@ -540,6 +557,11 @@ implements TalentReceiptStoreV1 {
         const snapshot =
           await transaction.get(
             reference,
+          );
+
+        const now =
+          cloneDate(
+            this.nowProvider(),
           );
 
         if (!snapshot.exists) {
@@ -595,6 +617,15 @@ implements TalentReceiptStoreV1 {
             documentId:
               identity.documentId,
           });
+        }
+
+        if (
+          receipt.correlationId !==
+          context.canonicalRequest.correlationId
+        ) {
+          return invariant(
+            "Receipt correlationId is inconsistent with its fingerprint.",
+          );
         }
 
         if (
@@ -723,6 +754,15 @@ implements TalentReceiptStoreV1 {
         ) {
           return invariant(
             "Receipt fingerprint changed during finalize.",
+          );
+        }
+
+        if (
+          receipt.correlationId !==
+          input.context.canonicalRequest.correlationId
+        ) {
+          return invariant(
+            "Receipt correlationId changed during finalize.",
           );
         }
 
