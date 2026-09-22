@@ -14,12 +14,15 @@ export type TalentEndpointErrorCodeV1 =
   | "SCHEMA_VIOLATION"
   | "PROHIBITED_PII"
   | "TENANT_MISMATCH"
+  | "IDEMPOTENCY_CONFLICT"
+  | "IDEMPOTENCY_IN_PROGRESS"
+  | "OUTCOME_UNKNOWN"
   | "INTERNAL_FAILURE";
 
 export interface TalentEndpointErrorDefinitionV1 {
   readonly statusCode: number;
   readonly category: "REQUEST" | "AUTHENTICATION" | "AUTHORIZATION" |
-    "GOVERNANCE" | "TENANCY" | "INTERNAL";
+    "GOVERNANCE" | "TENANCY" | "IDEMPOTENCY" | "INTERNAL";
   readonly retryable: boolean;
   readonly message: string;
 }
@@ -80,6 +83,24 @@ export const TALENT_ENDPOINT_ERRORS_V1: Readonly<
     category: "TENANCY",
     retryable: false,
     message: "The tenant mapping is not permitted.",
+  }),
+  IDEMPOTENCY_CONFLICT: Object.freeze({
+    statusCode: 409,
+    category: "IDEMPOTENCY",
+    retryable: false,
+    message: "The request conflicts with an existing idempotency receipt.",
+  }),
+  IDEMPOTENCY_IN_PROGRESS: Object.freeze({
+    statusCode: 409,
+    category: "IDEMPOTENCY",
+    retryable: true,
+    message: "An identical request is already in progress.",
+  }),
+  OUTCOME_UNKNOWN: Object.freeze({
+    statusCode: 503,
+    category: "IDEMPOTENCY",
+    retryable: true,
+    message: "The prior request outcome is unknown and requires reconciliation.",
   }),
   INTERNAL_FAILURE: Object.freeze({
     statusCode: 503,

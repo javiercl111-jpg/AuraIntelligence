@@ -12,7 +12,10 @@ import {
   type TalentEndpointDependenciesV1,
   type TalentEndpointRequestV1,
   type TalentEndpointResponseV1,
-} from "./talentEndpointV1.js";
+} from "./talentEndpointV1.js";import type {
+  TalentReceiptReserveDecisionV1,
+  TalentReceiptStoreV1,
+} from "./talentReceiptIdempotencyV1.js";
 import type {
   TalentTenantAuthorityInputV1,
   TalentTenantMappingCandidateV1,
@@ -135,6 +138,62 @@ function activeRegistry(): TalentTenantRegistryV1 {
     }),
   };
 }
+interface ReceiptHarnessV1 {
+  reserveCalls: number;
+  finalizeCalls: number;
+  reserveContexts: unknown[];
+  finalizeInputs: unknown[];
+  reserveError: Error | null;
+  finalizeError: Error | null;
+}
+
+function createReceiptHarnessV1(): ReceiptHarnessV1 {
+  return {
+    reserveCalls: 0,
+    finalizeCalls: 0,
+    reserveContexts: [],
+    finalizeInputs: [],
+    reserveError: null,
+    finalizeError: null,
+  };
+}
+
+function receiptDecisionV1(
+  value: Readonly<Record<string, unknown>>,
+): TalentReceiptReserveDecisionV1 {
+  return value as unknown as TalentReceiptReserveDecisionV1;
+}
+
+function reservedOwnerDecisionV1(): TalentReceiptReserveDecisionV1 {
+  return receiptDecisionV1({
+    kind: "RESERVED_OWNER",
+    reservationId: "4f359f13-d149-41ae-a42f-f0f69769fc10",
+  });
+}
+
+function testReceiptStoreV1(
+  decision: TalentReceiptReserveDecisionV1,
+  harness: ReceiptHarnessV1 = createReceiptHarnessV1(),
+): TalentReceiptStoreV1 {
+  return {
+    reserve: async (context) => {
+      harness.reserveCalls += 1;
+      harness.reserveContexts.push(context);
+      if (harness.reserveError !== null) {
+        throw harness.reserveError;
+      }
+      return decision;
+    },
+    finalize: async (input) => {
+      harness.finalizeCalls += 1;
+      harness.finalizeInputs.push(input);
+      if (harness.finalizeError !== null) {
+        throw harness.finalizeError;
+      }
+      return undefined as never;
+    },
+  };
+}
 
 function defaultDependencies(
   overrides: Partial<TalentEndpointDependenciesV1> = {},
@@ -144,6 +203,7 @@ function defaultDependencies(
     readAuthenticatedPrincipal: () => authenticatedPrincipalV1,
     readProjectId: () => "aura-intel-preview",
     createTenantRegistry: activeRegistry,
+    createReceiptStore: () => testReceiptStoreV1(reservedOwnerDecisionV1()),
     ...overrides,
   };
 }
@@ -195,6 +255,7 @@ test("non-POST is method-first and touches no headers, secrets, project, or body
     readAuthenticatedPrincipal: () => { dependencyCalls += 1; throw new Error(); },
     readProjectId: () => { dependencyCalls += 1; throw new Error(); },
     createTenantRegistry: () => { dependencyCalls += 1; throw new Error(); },
+    createReceiptStore: () => { dependencyCalls += 1; throw new Error(); },
   });
   assertErrorResponse(response, 405, "METHOD_NOT_ALLOWED");
   assert.equal(response.header("Allow"), "POST");
@@ -328,6 +389,7 @@ test("executes the ratified authentication, body, project, and tenant order", as
         },
       };
     },
+    createReceiptStore: () => testReceiptStoreV1(reservedOwnerDecisionV1()),
   });
   assert.deepEqual(events, [
     "bearer", "credential", "principal", "media", "rawBody",
@@ -460,4 +522,228 @@ test("bearer credentials and rejected request content are never logged or reflec
     console.error = original.error;
   }
   assert.equal(messages.length, 0);
+});
+
+test("idempotency conflict returns 409 without finalization", async () => {
+  const harness = createReceiptHarnessV1();
+  const response = await invoke(postRequest(), {
+    createReceiptStore: () => testReceiptStoreV1(
+      receiptDecisionV1({ kind: "IDEMPOTENCY_CONFLICT" }),
+      harness,
+    ),
+  });
+
+  assertErrorResponse(response, 409, "IDEMPOTENCY_CONFLICT", "validated");
+  assert.equal(harness.reserveCalls, 1);
+  assert.equal(harness.finalizeCalls, 0);
+});
+
+test("idempotency in-progress returns retryable 409 without finalization", async () => {
+  const harness = createReceiptHarnessV1();
+  const response = await invoke(postRequest(), {
+    createReceiptStore: () => testReceiptStoreV1(
+      receiptDecisionV1({ kind: "IDEMPOTENCY_IN_PROGRESS" }),
+      harness,
+    ),
+  });
+
+  assertErrorResponse(response, 409, "IDEMPOTENCY_IN_PROGRESS", "validated");
+  assert.equal(harness.reserveCalls, 1);
+  assert.equal(harness.finalizeCalls, 0);
+});
+
+test("outcome-unknown returns fail-closed 503 without finalization", async () => {
+  const harness = createReceiptHarnessV1();
+  const response = await invoke(postRequest(), {
+    createReceiptStore: () => testReceiptStoreV1(
+      receiptDecisionV1({ kind: "OUTCOME_UNKNOWN" }),
+      harness,
+    ),
+  });
+
+  assertErrorResponse(response, 503, "OUTCOME_UNKNOWN", "validated");
+  assert.equal(harness.reserveCalls, 1);
+  assert.equal(harness.finalizeCalls, 0);
+});
+
+test("reserved owner binds server-resolved tenant and finalizes exact F1D terminal outcome", async () => {
+  const harness = createReceiptHarnessV1();
+
+  const response = await invoke(postRequest(), {
+    createReceiptStore: () => testReceiptStoreV1(
+      reservedOwnerDecisionV1(),
+      harness,
+    ),
+  });
+
+  assertErrorResponse(response, 503, "INTERNAL_FAILURE", "validated");
+  assert.equal(harness.reserveCalls, 1);
+  assert.equal(harness.finalizeCalls, 1);
+
+  const context =
+    harness.reserveContexts[0] as Record<string, unknown>;
+
+  assert.equal(
+    context.authenticatedConsumerId,
+    TALENT_BRIDGE_CONSUMER_ID_V1,
+  );
+
+  assert.equal(
+    context.auraTenantId,
+    "aura-tenant-secret",
+  );
+
+  const canonicalRequest =
+    context.canonicalRequest as Record<string, unknown>;
+
+  assert.equal(
+    canonicalRequest.hcmCompanyId,
+    "company_123",
+  );
+
+  const finalizeInput =
+    harness.finalizeInputs[0] as Record<string, unknown>;
+
+  assert.equal(
+    finalizeInput.reservationId,
+    "4f359f13-d149-41ae-a42f-f0f69769fc10",
+  );
+
+  assert.equal(
+    finalizeInput.terminalHttpStatus,
+    503,
+  );
+
+  assert.equal(
+    finalizeInput.terminalOutcomeCode,
+    "INTERNAL_FAILURE",
+  );
+
+  assert.equal(
+    finalizeInput.context,
+    harness.reserveContexts[0],
+  );
+});
+
+test("finalized replay returns terminal outcome without finalization or downstream reexecution", async () => {
+  const harness = createReceiptHarnessV1();
+  let forbiddenCalls = 0;
+
+  const dependencies = {
+    ...defaultDependencies({
+      createReceiptStore: () => testReceiptStoreV1(
+        receiptDecisionV1({
+          kind: "REPLAY_FINALIZED",
+          terminalHttpStatus: 503,
+          terminalOutcomeCode: "INTERNAL_FAILURE",
+        }),
+        harness,
+      ),
+    }),
+    invokeProvider: () => { forbiddenCalls += 1; },
+    implementReplay: () => { forbiddenCalls += 1; },
+    scoreTalent: () => { forbiddenCalls += 1; },
+    createEmploymentAction: () => { forbiddenCalls += 1; },
+  };
+
+  const response = new MemoryResponse();
+  await talentEndpointV1(postRequest(), response, dependencies);
+
+  assertErrorResponse(response, 503, "INTERNAL_FAILURE", "validated");
+  assert.equal(harness.reserveCalls, 1);
+  assert.equal(harness.finalizeCalls, 0);
+  assert.equal(forbiddenCalls, 0);
+});
+
+test("receipt reserve and finalize failures remain generic internal failures", async () => {
+  const reserveHarness = createReceiptHarnessV1();
+  reserveHarness.reserveError = new Error("reserve-failure");
+
+  const reserveResponse = await invoke(postRequest(), {
+    createReceiptStore: () => testReceiptStoreV1(
+      reservedOwnerDecisionV1(),
+      reserveHarness,
+    ),
+  });
+
+  assertErrorResponse(
+    reserveResponse,
+    503,
+    "INTERNAL_FAILURE",
+    "validated",
+  );
+
+  assert.equal(reserveHarness.reserveCalls, 1);
+  assert.equal(reserveHarness.finalizeCalls, 0);
+
+  const finalizeHarness = createReceiptHarnessV1();
+  finalizeHarness.finalizeError = new Error("finalize-failure");
+
+  const finalizeResponse = await invoke(postRequest(), {
+    createReceiptStore: () => testReceiptStoreV1(
+      reservedOwnerDecisionV1(),
+      finalizeHarness,
+    ),
+  });
+
+  assertErrorResponse(
+    finalizeResponse,
+    503,
+    "INTERNAL_FAILURE",
+    "validated",
+  );
+
+  assert.equal(finalizeHarness.reserveCalls, 1);
+  assert.equal(finalizeHarness.finalizeCalls, 1);
+});
+
+test("failures before successful tenant resolution never create a receipt store", async () => {
+  let unknownProjectReceiptCreates = 0;
+
+  const unknownProjectResponse = await invoke(postRequest(), {
+    readProjectId: () => undefined,
+    createReceiptStore: () => {
+      unknownProjectReceiptCreates += 1;
+      return testReceiptStoreV1(reservedOwnerDecisionV1());
+    },
+  });
+
+  assertErrorResponse(
+    unknownProjectResponse,
+    503,
+    "INTERNAL_FAILURE",
+    "validated",
+  );
+
+  assert.equal(
+    unknownProjectReceiptCreates,
+    0,
+  );
+
+  let tenantMismatchReceiptCreates = 0;
+
+  const tenantMismatchResponse = await invoke(postRequest(), {
+    createTenantRegistry: () => ({
+      readAuthoritySnapshot: async () => ({
+        forward: [],
+        reverse: [],
+      }),
+    }),
+    createReceiptStore: () => {
+      tenantMismatchReceiptCreates += 1;
+      return testReceiptStoreV1(reservedOwnerDecisionV1());
+    },
+  });
+
+  assertErrorResponse(
+    tenantMismatchResponse,
+    403,
+    "TENANT_MISMATCH",
+    "validated",
+  );
+
+  assert.equal(
+    tenantMismatchReceiptCreates,
+    0,
+  );
 });

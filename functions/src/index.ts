@@ -7,6 +7,7 @@ import {
   TALENT_BRIDGE_CONSUMER_ID_V1,
 } from "./talent/talentBridgeConstantsV1.js";
 import { FirestoreTalentTenantRegistryV1 } from "./talent/firestoreTalentTenantRegistryV1.js";
+import { FirestoreTalentReceiptStoreV1 } from "./talent/firestoreTalentReceiptStoreV1.js";
 import { talentEndpointV1 } from "./talent/talentEndpointV1.js";
 
 const talentCredentialSetV1 = defineJsonSecret<unknown>(
@@ -31,6 +32,7 @@ export const talentIntelligenceEvaluationV1 = onRequest(
       readAuthenticatedPrincipal: () => talentAuthenticatedPrincipalV1,
       readProjectId: () => projectID.value(),
       createTenantRegistry: () => new FirestoreTalentTenantRegistryV1(),
+      createReceiptStore: () => new FirestoreTalentReceiptStoreV1(),
     });
   },
 );

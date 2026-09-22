@@ -20,7 +20,10 @@ import { parseTalentRawJsonV1 } from "./talentRawJsonV1.js";
 import {
   validateTalentRequestSchemaV1,
   type TalentCanonicalRequestV1,
-} from "./talentRequestSchemaV1.js";
+} from "./talentRequestSchemaV1.js";import {
+  type TalentReceiptContextV1,
+  type TalentReceiptStoreV1,
+} from "./talentReceiptIdempotencyV1.js";
 import {
   resolveTalentBridgeEnvironmentV1,
   resolveTalentTenantAuthorityV1,
@@ -45,6 +48,7 @@ export interface TalentEndpointDependenciesV1 {
   readonly readAuthenticatedPrincipal: () => TalentAuthenticatedPrincipalV1;
   readonly readProjectId: () => string | undefined;
   readonly createTenantRegistry: () => TalentTenantRegistryV1;
+  readonly createReceiptStore: () => TalentReceiptStoreV1;
 }
 
 function sendError(
@@ -155,9 +159,10 @@ export async function talentEndpointV1(
     return;
   }
 
+  let auraTenantId: string;
   try {
     const registry = dependencies.createTenantRegistry();
-    await resolveTalentTenantAuthorityV1({
+    auraTenantId = await resolveTalentTenantAuthorityV1({
       environment,
       authenticatedConsumerId: principal.consumerId,
       hcmCompanyId: canonicalRequest.hcmCompanyId,
@@ -167,6 +172,61 @@ export async function talentEndpointV1(
       sendError(response, "TENANT_MISMATCH", requestId, correlationId);
       return;
     }
+    sendError(response, "INTERNAL_FAILURE", requestId, correlationId);
+    return;
+  }
+
+  const receiptContext: TalentReceiptContextV1 = Object.freeze({
+    environment,
+    authenticatedConsumerId: principal.consumerId,
+    auraTenantId,
+    canonicalRequest,
+  });
+
+  try {
+    const receiptStore = dependencies.createReceiptStore();
+    const decision = await receiptStore.reserve(receiptContext);
+
+    if (decision.kind === "IDEMPOTENCY_CONFLICT") {
+      sendError(response, "IDEMPOTENCY_CONFLICT", requestId, correlationId);
+      return;
+    }
+
+    if (decision.kind === "IDEMPOTENCY_IN_PROGRESS") {
+      sendError(response, "IDEMPOTENCY_IN_PROGRESS", requestId, correlationId);
+      return;
+    }
+
+    if (decision.kind === "OUTCOME_UNKNOWN") {
+      sendError(response, "OUTCOME_UNKNOWN", requestId, correlationId);
+      return;
+    }
+
+    if (decision.kind === "REPLAY_FINALIZED") {
+      if (
+        decision.terminalHttpStatus !== 503 ||
+        decision.terminalOutcomeCode !== "INTERNAL_FAILURE"
+      ) {
+        sendError(response, "INTERNAL_FAILURE", requestId, correlationId);
+        return;
+      }
+
+      sendError(response, "INTERNAL_FAILURE", requestId, correlationId);
+      return;
+    }
+
+    if (decision.kind !== "RESERVED_OWNER") {
+      sendError(response, "INTERNAL_FAILURE", requestId, correlationId);
+      return;
+    }
+
+    await receiptStore.finalize({
+      context: receiptContext,
+      reservationId: decision.reservationId,
+      terminalHttpStatus: 503,
+      terminalOutcomeCode: "INTERNAL_FAILURE",
+    });
+  } catch {
     sendError(response, "INTERNAL_FAILURE", requestId, correlationId);
     return;
   }
