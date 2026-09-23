@@ -7,7 +7,7 @@ import type { GrowthConversation, GrowthConversationTurn } from '../types/growth
 import type { GrowthObjective } from '../types/growthObjective';
 import type { BrandBrain } from '../types/brandBrain';
 import type { CampaignStrategy } from '../types/campaignStrategy';
-import { growthConversationService } from '../services/growthConversationMockService';
+import { growthConversationService } from '../services/growthConversationProductionService';
 import { growthObjectiveService } from '../services/growthObjectiveMockService';
 import { brandBrainMockService } from '../services/brandBrainMockService';
 import { campaignStrategyMockService } from '../services/campaignStrategyMockService';

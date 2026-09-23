@@ -5,7 +5,7 @@ import { CampaignStrategyValidator } from './CampaignStrategyValidator';
 
 import * as goMock from './growthObjectiveMockService';
 import * as bbMock from './brandBrainMockService';
-import * as gcMock from './growthConversationMockService';
+import * as gcRuntime from './growthConversationProductionService';
 
 class CampaignStrategyMockService implements ICampaignStrategyService {
   private strategies = new Map<string, CampaignStrategy>();
@@ -28,7 +28,7 @@ class CampaignStrategyMockService implements ICampaignStrategyService {
 
     const objective = await goMock.growthObjectiveService.getObjective(objectiveId);
     const brandBrain = await bbMock.brandBrainMockService.getProfile(brandBrainId);
-    const conversation = await gcMock.growthConversationService.getConversation(conversationId);
+    const conversation = await gcRuntime.growthConversationService.getConversation(conversationId);
 
     const built = CampaignStrategyBuilder.buildStrategy(
       tenantId,
