@@ -144,6 +144,82 @@ describe(
           isDevelopment: false,
         }),
       ).toBe('growth');
+
     });
+
+  it('allows Growth on the certified remote Preview host with explicit remote Preview authority', () => {
+    expect(
+      resolveProductSurfaceAuthority({
+        configuredSurface: 'growth',
+        hostname: 'aura-growth-plr3xdtg0-javiers-projects-eab33ae8.vercel.app',
+        isDevelopment: false,
+        remoteGrowthPreviewAuthority: 'true',
+      }),
+    ).toBe('growth');
+  });
+
+  it('fails closed on the certified remote Preview host when authority is missing', () => {
+    expect(
+      resolveProductSurfaceAuthority({
+        configuredSurface: 'growth',
+        hostname: 'aura-growth-plr3xdtg0-javiers-projects-eab33ae8.vercel.app',
+        isDevelopment: false,
+      }),
+    ).toBe('invalid');
+  });
+
+  it('fails closed on the certified remote Preview host when authority is false', () => {
+    expect(
+      resolveProductSurfaceAuthority({
+        configuredSurface: 'growth',
+        hostname: 'aura-growth-plr3xdtg0-javiers-projects-eab33ae8.vercel.app',
+        isDevelopment: false,
+        remoteGrowthPreviewAuthority: 'false',
+      }),
+    ).toBe('invalid');
+  });
+
+  it('fails closed for an unrelated Vercel host even with remote Preview authority', () => {
+    expect(
+      resolveProductSurfaceAuthority({
+        configuredSurface: 'growth',
+        hostname: 'unrelated-project.vercel.app',
+        isDevelopment: false,
+        remoteGrowthPreviewAuthority: 'true',
+      }),
+    ).toBe('invalid');
+  });
+
+  it('fails closed for Intelligence on the Growth remote Preview namespace', () => {
+    expect(
+      resolveProductSurfaceAuthority({
+        configuredSurface: 'intelligence',
+        hostname: 'aura-growth-plr3xdtg0-javiers-projects-eab33ae8.vercel.app',
+        isDevelopment: false,
+        remoteGrowthPreviewAuthority: 'true',
+      }),
+    ).toBe('invalid');
+  });
+
+  it('fails closed for a non-Vercel host even with remote Preview authority', () => {
+    expect(
+      resolveProductSurfaceAuthority({
+        configuredSurface: 'growth',
+        hostname: 'growth-preview.example.com',
+        isDevelopment: false,
+        remoteGrowthPreviewAuthority: 'true',
+      }),
+    ).toBe('invalid');
+  });
+
+  it('preserves the production Growth host without remote Preview authority', () => {
+    expect(
+      resolveProductSurfaceAuthority({
+        configuredSurface: 'growth',
+        hostname: 'growth.auranexus.io',
+        isDevelopment: false,
+      }),
+    ).toBe('growth');
+  });
   },
 );

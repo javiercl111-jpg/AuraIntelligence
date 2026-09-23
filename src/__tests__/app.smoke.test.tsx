@@ -84,6 +84,7 @@ describe('App — Integration Smoke Tests', () => {
 
   it('renders GrowthStudioEntry when feature flag is ON and user is authenticated', async () => {
     mockFlagValue.current = true;
+    vi.stubEnv('VITE_AURA_PRODUCT_SURFACE', 'growth');
 
     // Override the auth mock to simulate authenticated state
     const firebaseAuth = await import('firebase/auth');

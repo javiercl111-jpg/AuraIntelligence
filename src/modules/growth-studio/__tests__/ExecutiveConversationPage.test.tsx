@@ -1,14 +1,74 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GrowthI18nProvider } from '../i18n/GrowthI18nProvider';
 import { GrowthRuntimeProvider } from '../runtime/GrowthRuntimeProvider';
 import ExecutiveConversationPage from '../components/ExecutiveConversationPage';
-import { setMockResponseDelay } from '../services/growthConversationMockService';
+import { setProductionResponseDelay as setMockResponseDelay } from '../services/growthConversationProductionService';
 import '@testing-library/jest-dom';
+
+vi.mock('../../../firebase', () => ({
+  auth: {
+    currentUser: {
+      getIdToken: vi.fn().mockResolvedValue(
+        'test-growth-advisor-id-token',
+      ),
+    },
+  },
+}));
+const TEST_BRIDGE_URL = 'test-local://growth-advisor';
+
+const growthAdvisorFetchMock = vi.fn(
+  async (
+    _input: RequestInfo | URL,
+    init?: RequestInit,
+  ): Promise<Response> => {
+    const body =
+      typeof init?.body === 'string'
+        ? JSON.parse(init.body)
+        : {};
+
+    const askedQuestions =
+      Array.isArray(body.askedQuestions)
+        ? body.askedQuestions
+        : [];
+
+    const questions: Record<number, string> = {
+      1: '¿Qué producto, servicio o línea de negocio quieres impulsar?',
+      2: '¿A qué audiencia o segmento deseas llegar?',
+      3: '¿En qué región o mercado quieres concentrar esta estrategia?',
+      4: '¿En qué canales o medios quieres desarrollar esta estrategia?',
+      5: '¿Qué acción quieres que realice la audiencia después de ver el contenido?',
+      6: '¿Hay alguna consideración adicional que debamos tomar en cuenta?',
+    };
+
+    const nextQuestion =
+      questions[askedQuestions.length] ??
+      '¿Hay alguna consideración adicional que debamos tomar en cuenta?';
+
+    return {
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        ok: true,
+        conversationProposal: {
+          nextQuestion,
+        },
+      }),
+    } as unknown as Response;
+  },
+);
 
 describe('ExecutiveConversationPage', () => {
   beforeEach(() => {
     setMockResponseDelay(0);
+    vi.stubEnv('VITE_GROWTH_ADVISOR_BRIDGE_URL', TEST_BRIDGE_URL);
+    vi.stubGlobal('fetch', growthAdvisorFetchMock);
+    growthAdvisorFetchMock.mockClear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
   it('renders and starts conversation', async () => {
@@ -126,6 +186,9 @@ describe('ExecutiveConversationPage', () => {
 
     // Enviar Audiencia (Hoteles)
     await waitFor(() => {
+      expect(
+        screen.getByText(/producto, servicio o línea de negocio quieres impulsar/i),
+      ).toBeInTheDocument();
       expect(input).not.toBeDisabled();
     });
     fireEvent.change(input, { target: { value: 'Hoteles' } });
@@ -133,6 +196,9 @@ describe('ExecutiveConversationPage', () => {
 
     // Enviar Región (México)
     await waitFor(() => {
+      expect(
+        screen.getByText(/audiencia o segmento deseas llegar/i),
+      ).toBeInTheDocument();
       expect(input).not.toBeDisabled();
     });
     fireEvent.change(input, { target: { value: 'México' } });
@@ -140,6 +206,9 @@ describe('ExecutiveConversationPage', () => {
 
     // Enviar Resultado esperado (Incrementar ventas 20%)
     await waitFor(() => {
+      expect(
+        screen.getByText(/región o mercado quieres concentrar esta estrategia/i),
+      ).toBeInTheDocument();
       expect(input).not.toBeDisabled();
     });
     fireEvent.change(input, { target: { value: 'Incrementar ventas 20%' } });
@@ -162,7 +231,7 @@ describe('ExecutiveConversationPage', () => {
     // Después de canales, el flujo solicita el CTA principal.
     await waitFor(() => {
       expect(
-        screen.getByText(/¿Cuál quieres que sea el llamado a la acción principal/i),
+        screen.getByText(/¿Qué acción quieres que realice la audiencia después de ver el contenido/i),
       ).toBeInTheDocument();
       expect(input).not.toBeDisabled();
     });
