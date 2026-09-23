@@ -17,6 +17,7 @@ export interface ProductSurfaceAuthorityInput {
     | undefined
     | null;
   readonly isDevelopment: boolean;
+  readonly remoteGrowthPreviewAuthority?: string;
 }
 
 const GROWTH_SURFACE = 'growth';
@@ -77,7 +78,16 @@ export function resolveProductSurfaceAuthority(
 
   if (
     configured === 'growth' &&
-    hostname === GROWTH_HOST
+    (
+      hostname === GROWTH_HOST ||
+      (
+        input.remoteGrowthPreviewAuthority === 'true' &&
+        hostname.startsWith('aura-growth-') &&
+        hostname.endsWith(
+          '-javiers-projects-eab33ae8.vercel.app',
+        )
+      )
+    )
   ) {
     return 'growth';
   }
@@ -117,5 +127,7 @@ export function getDevelopmentProductSurface():
         : undefined,
     isDevelopment:
       import.meta.env.DEV,
+    remoteGrowthPreviewAuthority:
+      import.meta.env.VITE_AURA_GROWTH_REMOTE_PREVIEW,
   });
 }
