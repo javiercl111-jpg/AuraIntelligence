@@ -1,0 +1,20 @@
+{
+  "name": "hcm-aura-talent-bridge-v1-functions",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "firebase-admin": "14.4.0",
+    "firebase-functions": "7.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.3",
+    "typescript": "~6.0.2"
+  }
+}
