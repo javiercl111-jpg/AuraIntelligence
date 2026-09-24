@@ -17,7 +17,7 @@ describe('GrowthConversationMockService', () => {
     });
 
     expect(conv.status).toBe('active');
-    expect(conv.currentStage).toBe('understanding_objective');
+    expect(conv.currentStage).toBe('understanding_product');
     expect(conv.tenantId).toBe('growth_demo_tenant');
 
     const turns = await growthConversationService.getConversationTurns(conv.id);
@@ -30,12 +30,12 @@ describe('GrowthConversationMockService', () => {
       tenantId: 'test', companyId: 'test', userId: 'test'
     });
 
-    // 1. Send Objective with Product -> expect Audience question (skipping product question)
-    await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'Quiero vender Aura HCM' });
+    // 1. Send Product -> expect Audience question
+    await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'Aura HCM' });
     await growthConversationService.generateAssistantResponse(conv.id);
     let updatedConv = await growthConversationService.getConversation(conv.id);
     expect(updatedConv?.currentStage).toBe('understanding_audience');
-    expect(updatedConv?.structuredContext.objective).toBe('Quiero vender');
+    expect(updatedConv?.structuredContext.objective).toBeUndefined();
     expect(updatedConv?.structuredContext.productOrService).toBe('Aura HCM');
 
     // 2. Send Audience -> expect Region question
@@ -50,11 +50,12 @@ describe('GrowthConversationMockService', () => {
     updatedConv = await growthConversationService.getConversation(conv.id);
     expect(updatedConv?.currentStage).toBe('understanding_result');
 
-    // 4. Send Result -> expect Channels question
+    // 4. Send measurable objective/result -> expect Channels question
     await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'My result' });
     await growthConversationService.generateAssistantResponse(conv.id);
     updatedConv = await growthConversationService.getConversation(conv.id);
     expect(updatedConv?.currentStage).toBe('understanding_channels');
+    expect(updatedConv?.structuredContext.objective).toBe('My result');
     expect(updatedConv?.structuredContext.expectedResult).toBe('My result');
 
     // 5. Send Channels -> expect CTA question
@@ -97,25 +98,21 @@ describe('GrowthConversationMockService', () => {
     expect(updatedConv?.status).toBe('completed');
   });
 
-  it('asks for product if not identified in objective', async () => {
+  it('captures the first answer as product before asking for audience', async () => {
     const conv = await growthConversationService.startConversation({
       tenantId: 'test', companyId: 'test', userId: 'test'
     });
 
-    // 1. Send Objective without Product -> expect Product question
-    await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'Quiero crecer este año' });
-    await growthConversationService.generateAssistantResponse(conv.id);
-    let updatedConv = await growthConversationService.getConversation(conv.id);
-    expect(updatedConv?.currentStage).toBe('understanding_product');
-
-    // 2. Send Product -> expect Audience question
     await growthConversationService.addTurn({ conversationId: conv.id, role: 'user', content: 'Aura HCM' });
     await growthConversationService.generateAssistantResponse(conv.id);
-    updatedConv = await growthConversationService.getConversation(conv.id);
+
+    const updatedConv = await growthConversationService.getConversation(conv.id);
+
     expect(updatedConv?.currentStage).toBe('understanding_audience');
     expect(updatedConv?.structuredContext.productOrService).toBe('Aura HCM');
+    expect(updatedConv?.structuredContext.objective).toBeUndefined();
+    expect(updatedConv?.structuredContext.expectedResult).toBeUndefined();
   });
-
   it('handles correction flow in executive_reflection', async () => {
     const conv = await growthConversationService.startConversation({
       tenantId: 'test', companyId: 'test', userId: 'test'
@@ -337,7 +334,7 @@ describe('GrowthConversationMockService', () => {
         .campaignChannels,
     ).toBeUndefined();
   });
-  it("preserves the user's commercial intent while extracting the product", async () => {
+  it("captures the complete first answer as product under the product-first contract", async () => {
     const conversation =
       await growthConversationService.startConversation({
         userId: 'user-objective-parser',
@@ -361,12 +358,16 @@ describe('GrowthConversationMockService', () => {
       );
 
     expect(
-      state?.structuredContext.objective,
-    ).toBe('Quiero comercializar');
+      state?.structuredContext.productOrService,
+    ).toBe('Quiero comercializar Aura HCM');
 
     expect(
-      state?.structuredContext.productOrService,
-    ).toBe('Aura HCM');
+      state?.structuredContext.objective,
+    ).toBeUndefined();
+
+    expect(
+      state?.structuredContext.expectedResult,
+    ).toBeUndefined();
 
     expect(
       state?.structuredContext.audience,
@@ -374,10 +375,6 @@ describe('GrowthConversationMockService', () => {
 
     expect(
       state?.structuredContext.region,
-    ).toBeUndefined();
-
-    expect(
-      state?.structuredContext.expectedResult,
     ).toBeUndefined();
 
     expect(

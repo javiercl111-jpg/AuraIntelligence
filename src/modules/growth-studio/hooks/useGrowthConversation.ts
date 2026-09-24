@@ -103,7 +103,7 @@ export const useGrowthConversation = (
             return {
               ...turn,
               content:
-                `${greeting}${companyContext} Voy a utilizar ese contexto y preguntarte sólo lo que falte para completar la estrategia. Para esta iniciativa, ¿qué objetivo específico quieres alcanzar?`,
+                `${greeting}${companyContext} Voy a utilizar ese contexto y preguntarte sólo lo que falte para completar la estrategia. Para esta iniciativa, ¿qué producto, servicio o línea de negocio quieres impulsar?`,
             };
           },
         );

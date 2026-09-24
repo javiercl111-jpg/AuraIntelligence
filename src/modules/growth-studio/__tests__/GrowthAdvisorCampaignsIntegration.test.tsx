@@ -142,6 +142,12 @@ describe(
               'Escribe tu respuesta...',
             ),
           ).toBeInTheDocument();
+
+          expect(
+            screen.getByText(
+              /producto, servicio o línea de negocio quieres impulsar/i,
+            ),
+          ).toBeInTheDocument();
         });
 
         const input =
@@ -190,17 +196,17 @@ describe(
 
         await submitAnswer(
           'Quiero vender Aura HCM',
-          /producto, servicio o línea de negocio quieres impulsar/i,
-        );
-
-        await submitAnswer(
-          'Hoteles',
           /audiencia o segmento deseas llegar/i,
         );
 
         await submitAnswer(
-          'México',
+          'Hoteles',
           /región o mercado quieres concentrar esta estrategia/i,
+        );
+
+        await submitAnswer(
+          'México',
+          /resultado|objetivo/i,
         );
 
         await submitAnswer(

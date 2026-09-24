@@ -49,7 +49,7 @@ const conversation = {
   objectiveId: null,
   status: 'active',
   currentStage:
-    'understanding_objective',
+    'understanding_product',
   structuredContext:
     sharedStructuredContext,
   schemaVersion: 1,
@@ -94,6 +94,11 @@ function RuntimeProbe() {
       <div data-testid="conversation-id">
         {runtime.conversation?.id ??
           'conversation-empty'}
+      </div>
+
+      <div data-testid="first-turn-content">
+        {runtime.turns[0]?.content ??
+          'turn-empty'}
       </div>
 
       <button
@@ -235,6 +240,14 @@ describe(
             .getConversationTurns,
         ).toHaveBeenCalledWith(
           conversation.id,
+        );
+
+        expect(
+          screen.getByTestId(
+            'first-turn-content',
+          ).textContent,
+        ).toContain(
+          'producto, servicio o línea de negocio',
         );
 
         expect(

@@ -241,13 +241,13 @@ export class GrowthConversationProductionService implements IGrowthConversationS
     const welcomeTurn = createTurn(
       conversation.id,
       'assistant',
-      '¡Hola! Soy tu asistente de Aura Growth Studio™. Para empezar a definir nuestra campaña de crecimiento, ¿cuál es el objetivo principal que deseas alcanzar?',
+      '¡Hola! Soy tu asistente de Aura Growth Studio™. Para empezar a definir nuestra campaña de crecimiento, ¿qué producto, servicio o línea de negocio quieres impulsar?',
       1
     );
     conversationTurns.set(conversation.id, [welcomeTurn]);
 
     // Advance stage automatically to waiting for objective input
-    conversation.currentStage = 'understanding_objective';
+    conversation.currentStage = 'understanding_product';
 
     return { ...conversation };
   }
@@ -374,6 +374,7 @@ export class GrowthConversationProductionService implements IGrowthConversationS
         nextStage = 'understanding_result';
         break;
       case 'understanding_result':
+        conv.structuredContext.objective = lastUserTurn?.content;
         conv.structuredContext.expectedResult = lastUserTurn?.content;
         content =
           '¿En qué canales o medios quieres desarrollar esta estrategia? Puedes indicar, por ejemplo, LinkedIn, Facebook, Instagram, email, sitio web u otros.';
@@ -512,7 +513,39 @@ export class GrowthConversationProductionService implements IGrowthConversationS
     }
 
     const turnNumber = turns.length + 1;
-    content = await requestGrowthAdvisorQuestionV1(conv, turns);
+    await requestGrowthAdvisorQuestionV1(conv, turns);
+
+    switch (nextStage) {
+      case 'understanding_product':
+        content =
+          '¿Qué producto, servicio o línea de negocio quieres impulsar?';
+        break;
+
+      case 'understanding_audience':
+        content =
+          '¿A qué audiencia o segmento deseas llegar?';
+        break;
+
+      case 'understanding_region':
+        content =
+          '¿En qué región o mercado quieres concentrar esta estrategia?';
+        break;
+
+      case 'understanding_result':
+        content =
+          '¿Qué objetivo o resultado medible quieres alcanzar?';
+        break;
+
+      case 'understanding_channels':
+        content =
+          '¿En qué canales o medios quieres desarrollar esta estrategia?';
+        break;
+
+      case 'understanding_cta':
+        content =
+          '¿Qué acción quieres que realice la audiencia después de ver el contenido?';
+        break;
+    }
 
     const assistantTurn = createTurn(conversationId, 'assistant', content, turnNumber);
     turns.push(assistantTurn);
