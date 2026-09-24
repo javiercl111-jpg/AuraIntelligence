@@ -86,7 +86,7 @@ describe('ExecutiveConversationPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Conversación Ejecutiva de Crecimiento')).toBeInTheDocument();
     });
-    expect(screen.getByText('Sesión de demostración · Sin IA productiva')).toBeInTheDocument();
+    expect(screen.getByText('Sesión de Growth Advisor · IA productiva')).toBeInTheDocument();
 
     // Wait for the first assistant message
     await waitFor(() => {
@@ -167,7 +167,7 @@ describe('ExecutiveConversationPage', () => {
         </GrowthI18nProvider>,
     );
 
-    // 1. Iniciar en welcome / waiting for objective
+    // 1. Iniciar product-first / waiting for product
     await waitFor(() => {
       expect(screen.getByPlaceholderText('Escribe tu respuesta...')).toBeInTheDocument();
     });
@@ -180,14 +180,24 @@ describe('ExecutiveConversationPage', () => {
     const input = screen.getByPlaceholderText('Escribe tu respuesta...');
     const submitBtn = screen.getByRole('button', { name: /enviar/i });
 
-    // Enviar Objetivo (Quiero vender Aura HCM)
+    await waitFor(() => {
+      expect(
+        screen.getByText(/producto, servicio o línea de negocio quieres impulsar/i),
+      ).toBeInTheDocument();
+      expect(input).not.toBeDisabled();
+    });
+
+    // Enviar Producto (Quiero vender Aura HCM)
     fireEvent.change(input, { target: { value: 'Quiero vender Aura HCM' } });
+    fireEvent.click(submitBtn);
+
+    fireEvent.change(input, { target: { value: 'Hoteles' } });
     fireEvent.click(submitBtn);
 
     // Enviar Audiencia (Hoteles)
     await waitFor(() => {
       expect(
-        screen.getByText(/producto, servicio o línea de negocio quieres impulsar/i),
+        screen.getByText(/audiencia o segmento deseas llegar/i),
       ).toBeInTheDocument();
       expect(input).not.toBeDisabled();
     });
@@ -197,20 +207,20 @@ describe('ExecutiveConversationPage', () => {
     // Enviar Región (México)
     await waitFor(() => {
       expect(
-        screen.getByText(/audiencia o segmento deseas llegar/i),
+        screen.getByText(/región o mercado quieres concentrar esta estrategia/i),
       ).toBeInTheDocument();
       expect(input).not.toBeDisabled();
     });
     fireEvent.change(input, { target: { value: 'México' } });
     fireEvent.click(submitBtn);
-
-    // Enviar Resultado esperado (Incrementar ventas 20%)
     await waitFor(() => {
       expect(
-        screen.getByText(/región o mercado quieres concentrar esta estrategia/i),
+        screen.getByText(/resultado|objetivo/i),
       ).toBeInTheDocument();
       expect(input).not.toBeDisabled();
     });
+
+    // Enviar Objetivo / Resultado esperado
     fireEvent.change(input, { target: { value: 'Incrementar ventas 20%' } });
     fireEvent.click(submitBtn);
     // El flujo vigente solicita canales antes de la reflexión.

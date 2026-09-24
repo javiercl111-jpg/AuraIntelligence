@@ -166,7 +166,7 @@ export const growthEs = {
     conversationTitle:
       'Conversación Ejecutiva de Crecimiento',
     mockSession:
-      'Sesión de demostración · Sin IA productiva',
+      'Sesión de Growth Advisor · IA productiva',
     closeConversation:
       'Cerrar conversación',
     completedPlaceholder:
