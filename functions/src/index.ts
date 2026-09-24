@@ -9,6 +9,7 @@ import {
 import { FirestoreTalentTenantRegistryV1 } from "./talent/firestoreTalentTenantRegistryV1.js";
 import { FirestoreTalentReceiptStoreV1 } from "./talent/firestoreTalentReceiptStoreV1.js";
 import { talentEndpointV1 } from "./talent/talentEndpointV1.js";
+import { FailClosedTalentExecutionBoundaryV1 } from "./talent/talentExecutionBoundaryV1.js";
 
 const talentCredentialSetV1 = defineJsonSecret<unknown>(
   TALENT_AUTH_SECRET_NAME_V1,
@@ -33,6 +34,7 @@ export const talentIntelligenceEvaluationV1 = onRequest(
       readProjectId: () => projectID.value(),
       createTenantRegistry: () => new FirestoreTalentTenantRegistryV1(),
       createReceiptStore: () => new FirestoreTalentReceiptStoreV1(),
+      createExecutionBoundary: () => new FailClosedTalentExecutionBoundaryV1(),
     });
   },
 );

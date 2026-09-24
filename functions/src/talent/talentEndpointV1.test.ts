@@ -12,7 +12,12 @@ import {
   type TalentEndpointDependenciesV1,
   type TalentEndpointRequestV1,
   type TalentEndpointResponseV1,
-} from "./talentEndpointV1.js";import type {
+} from "./talentEndpointV1.js";
+import type {
+  TalentExecutionBoundaryV1,
+  TalentExecutionInputV1,
+  TalentExecutionOutcomeV1,
+} from "./talentExecutionBoundaryV1.js";import type {
   TalentReceiptReserveDecisionV1,
   TalentReceiptStoreV1,
 } from "./talentReceiptIdempotencyV1.js";
@@ -138,6 +143,35 @@ function activeRegistry(): TalentTenantRegistryV1 {
     }),
   };
 }
+interface ExecutionHarnessV1 {
+  executeCalls: number;
+  inputs: TalentExecutionInputV1[];
+  outcome: TalentExecutionOutcomeV1;
+}
+
+function createExecutionHarnessV1(
+  outcome: TalentExecutionOutcomeV1 = Object.freeze({
+    kind: "EXECUTED",
+  }),
+): ExecutionHarnessV1 {
+  return {
+    executeCalls: 0,
+    inputs: [],
+    outcome,
+  };
+}
+
+function testExecutionBoundaryV1(
+  harness: ExecutionHarnessV1 = createExecutionHarnessV1(),
+): TalentExecutionBoundaryV1 {
+  return {
+    execute: async (input) => {
+      harness.executeCalls += 1;
+      harness.inputs.push(input);
+      return harness.outcome;
+    },
+  };
+}
 interface ReceiptHarnessV1 {
   reserveCalls: number;
   finalizeCalls: number;
@@ -204,6 +238,7 @@ function defaultDependencies(
     readProjectId: () => "aura-intel-preview",
     createTenantRegistry: activeRegistry,
     createReceiptStore: () => testReceiptStoreV1(reservedOwnerDecisionV1()),
+    createExecutionBoundary: () => testExecutionBoundaryV1(),
     ...overrides,
   };
 }
@@ -256,6 +291,7 @@ test("non-POST is method-first and touches no headers, secrets, project, or body
     readProjectId: () => { dependencyCalls += 1; throw new Error(); },
     createTenantRegistry: () => { dependencyCalls += 1; throw new Error(); },
     createReceiptStore: () => { dependencyCalls += 1; throw new Error(); },
+    createExecutionBoundary: () => { dependencyCalls += 1; throw new Error(); },
   });
   assertErrorResponse(response, 405, "METHOD_NOT_ALLOWED");
   assert.equal(response.header("Allow"), "POST");
@@ -390,6 +426,7 @@ test("executes the ratified authentication, body, project, and tenant order", as
       };
     },
     createReceiptStore: () => testReceiptStoreV1(reservedOwnerDecisionV1()),
+    createExecutionBoundary: () => testExecutionBoundaryV1(),
   });
   assert.deepEqual(events, [
     "bearer", "credential", "principal", "media", "rawBody",
@@ -568,17 +605,38 @@ test("outcome-unknown returns fail-closed 503 without finalization", async () =>
 
 test("reserved owner binds server-resolved tenant and finalizes exact F1D terminal outcome", async () => {
   const harness = createReceiptHarnessV1();
+  const executionHarness = createExecutionHarnessV1();
 
   const response = await invoke(postRequest(), {
     createReceiptStore: () => testReceiptStoreV1(
       reservedOwnerDecisionV1(),
       harness,
     ),
+    createExecutionBoundary: () => testExecutionBoundaryV1(executionHarness),
   });
 
   assertErrorResponse(response, 503, "INTERNAL_FAILURE", "validated");
   assert.equal(harness.reserveCalls, 1);
   assert.equal(harness.finalizeCalls, 1);
+  assert.equal(executionHarness.executeCalls, 1);
+  assert.equal(executionHarness.inputs.length, 1);
+
+  const executionInput = executionHarness.inputs[0];
+
+  assert.equal(
+    executionInput.authenticatedConsumerId,
+    TALENT_BRIDGE_CONSUMER_ID_V1,
+  );
+
+  assert.equal(
+    executionInput.auraTenantId,
+    "aura-tenant-secret",
+  );
+
+  assert.equal(
+    executionInput.canonicalRequest.hcmCompanyId,
+    "company_123",
+  );
 
   const context =
     harness.reserveContexts[0] as Record<string, unknown>;
@@ -625,6 +683,28 @@ test("reserved owner binds server-resolved tenant and finalizes exact F1D termin
   );
 });
 
+test("reserved owner execution failure remains fail-closed without finalization", async () => {
+  const receiptHarness = createReceiptHarnessV1();
+  let executionCalls = 0;
+
+  const response = await invoke(postRequest(), {
+    createReceiptStore: () => testReceiptStoreV1(
+      reservedOwnerDecisionV1(),
+      receiptHarness,
+    ),
+    createExecutionBoundary: () => ({
+      execute: async () => {
+        executionCalls += 1;
+        throw new Error("execution-failure");
+      },
+    }),
+  });
+
+  assertErrorResponse(response, 503, "INTERNAL_FAILURE", "validated");
+  assert.equal(receiptHarness.reserveCalls, 1);
+  assert.equal(executionCalls, 1);
+  assert.equal(receiptHarness.finalizeCalls, 0);
+});
 test("finalized replay returns terminal outcome without finalization or downstream reexecution", async () => {
   const harness = createReceiptHarnessV1();
   let forbiddenCalls = 0;
@@ -684,6 +764,7 @@ test("receipt reserve and finalize failures remain generic internal failures", a
       reservedOwnerDecisionV1(),
       finalizeHarness,
     ),
+    createExecutionBoundary: () => testExecutionBoundaryV1(),
   });
 
   assertErrorResponse(

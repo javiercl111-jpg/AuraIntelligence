@@ -23,7 +23,10 @@ import {
 } from "./talentRequestSchemaV1.js";import {
   type TalentReceiptContextV1,
   type TalentReceiptStoreV1,
-} from "./talentReceiptIdempotencyV1.js";
+} from "./talentReceiptIdempotencyV1.js";import {
+  type TalentExecutionBoundaryV1,
+  type TalentExecutionInputV1,
+} from "./talentExecutionBoundaryV1.js";
 import {
   resolveTalentBridgeEnvironmentV1,
   resolveTalentTenantAuthorityV1,
@@ -49,6 +52,7 @@ export interface TalentEndpointDependenciesV1 {
   readonly readProjectId: () => string | undefined;
   readonly createTenantRegistry: () => TalentTenantRegistryV1;
   readonly createReceiptStore: () => TalentReceiptStoreV1;
+  readonly createExecutionBoundary: () => TalentExecutionBoundaryV1;
 }
 
 function sendError(
@@ -216,6 +220,21 @@ export async function talentEndpointV1(
     }
 
     if (decision.kind !== "RESERVED_OWNER") {
+      sendError(response, "INTERNAL_FAILURE", requestId, correlationId);
+      return;
+    }
+
+    const executionInput: TalentExecutionInputV1 = Object.freeze({
+      environment,
+      authenticatedConsumerId: principal.consumerId,
+      auraTenantId,
+      canonicalRequest,
+    });
+
+    const executionBoundary = dependencies.createExecutionBoundary();
+    const executionOutcome = await executionBoundary.execute(executionInput);
+
+    if (executionOutcome.kind !== "EXECUTED") {
       sendError(response, "INTERNAL_FAILURE", requestId, correlationId);
       return;
     }
