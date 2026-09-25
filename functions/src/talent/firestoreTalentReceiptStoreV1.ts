@@ -19,6 +19,22 @@ import {
   type TalentReceiptStoreV1,
 } from "./talentReceiptIdempotencyV1.js";
 import type { TalentBridgeEnvironmentV1 } from "./talentBridgeConstantsV1.js";
+import { exactTalentAIRecordV1, snapshotTalentAIJsonV1 } from "./talentAIRuntimeContractsV1.js";
+import { validateTalentContextScopeV1 } from "./auraTalentContextCompilerV1.js";
+import { snapshotTalentAdvisoryRequestV1, validateTalentAdvisoryBodyV1 } from "./talentAdvisoryResponseV1.js";
+import {
+  classifyTalentAdvisoryReceiptV1,
+  createTalentAdvisoryReservedReceiptV1,
+  parseTalentAdvisoryReceiptV1,
+  snapshotTalentAdvisoryBindingV1,
+  validateTalentAdvisoryReceiptV1,
+  type TalentAdvisoryFinalizedAcknowledgmentV1,
+  type TalentAdvisoryFinalizeInputV1,
+  type TalentAdvisoryReceiptRecordV1,
+  type TalentAdvisoryReceiptStoreV1,
+  type TalentAdvisoryReserveDecisionV1,
+  type TalentAdvisoryReserveInputV1,
+} from "./talentAdvisoryReceiptV1.js";
 
 export interface FirestoreReceiptDocumentReferenceV1 {
   readonly id: string;
@@ -812,5 +828,167 @@ implements TalentReceiptStoreV1 {
         });
       },
     );
+  }
+}
+
+function snapshotAdvisoryStoreInputV1(value: unknown): TalentAdvisoryReserveInputV1 {
+  const input = exactTalentAIRecordV1(snapshotTalentAIJsonV1(value, 294_912, "SCHEMA_VIOLATION"), [
+    "context", "executionBinding",
+  ]);
+  const context = exactTalentAIRecordV1(input.context, [
+    "environment", "authenticatedConsumerId", "auraTenantId", "canonicalRequest",
+  ]);
+  const canonicalRequest = snapshotTalentAdvisoryRequestV1(context.canonicalRequest);
+  const scope = validateTalentContextScopeV1({
+    environment: context.environment,
+    authenticatedConsumerId: context.authenticatedConsumerId,
+    auraTenantId: context.auraTenantId,
+    hcmCompanyId: canonicalRequest.hcmCompanyId,
+  });
+  return Object.freeze({
+    context: Object.freeze({
+      environment: scope.environment,
+      authenticatedConsumerId: scope.authenticatedConsumerId,
+      auraTenantId: scope.auraTenantId,
+      canonicalRequest,
+    }),
+    executionBinding: snapshotTalentAdvisoryBindingV1(input.executionBinding),
+  });
+}
+
+/** Decode storage timestamps without changing the certified legacy parser. */
+function decodeAdvisoryReceiptDocumentV1(value: unknown): Record<string, unknown> {
+  if (!isRecord(value) || (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)) {
+    return invariant("Invalid advisory receipt document.");
+  }
+  const keys = Reflect.ownKeys(value);
+  if (keys.length > 21) return invariant("Invalid advisory receipt fields.");
+  const record: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+  for (const key of keys) {
+    if (typeof key !== "string") return invariant("Invalid advisory receipt field.");
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !descriptor.enumerable || !("value" in descriptor)) {
+      return invariant("Invalid advisory receipt property.");
+    }
+    record[key] = descriptor.value;
+  }
+  for (const key of ["createdAt", "updatedAt", "leaseExpiresAt", "expiresAt"]) {
+    const timestamp = record[key];
+    if (timestamp instanceof Date) {
+      record[key] = Date.prototype.getTime.call(timestamp);
+    } else if (typeof timestamp === "object" && timestamp !== null && "toDate" in timestamp &&
+        typeof timestamp.toDate === "function") {
+      const date: unknown = timestamp.toDate();
+      if (!(date instanceof Date)) return invariant("Invalid advisory receipt timestamp.");
+      record[key] = Date.prototype.getTime.call(date);
+    }
+    if (typeof record[key] !== "number" || !Number.isSafeInteger(record[key]) || (record[key] as number) < 0) {
+      return invariant("Invalid advisory receipt time.");
+    }
+  }
+  return record;
+}
+
+function encodeAdvisoryReceiptDocumentV1(receipt: TalentAdvisoryReceiptRecordV1): Readonly<Record<string, unknown>> {
+  return Object.freeze({
+    ...receipt,
+    createdAt: new Date(receipt.createdAt),
+    updatedAt: new Date(receipt.updatedAt),
+    leaseExpiresAt: new Date(receipt.leaseExpiresAt),
+    expiresAt: new Date(receipt.expiresAt),
+  });
+}
+
+/** Explicit injection only. This class never constructs a client or activates a runtime. */
+export class FirestoreTalentAdvisoryReceiptStoreV1 implements TalentAdvisoryReceiptStoreV1 {
+  constructor(
+    private readonly firestore: FirestoreReceiptClientV1,
+    private readonly nowProvider: () => Date = () => new Date(),
+    private readonly reservationIdFactory: () => string = createTalentReservationIdV1,
+  ) {}
+
+  private nowMillis(): number {
+    const date = this.nowProvider();
+    if (!(date instanceof Date)) return invariant("Invalid advisory receipt clock.");
+    const now = Date.prototype.getTime.call(date);
+    if (!Number.isSafeInteger(now) || now < 0) return invariant("Invalid advisory receipt clock.");
+    return now;
+  }
+
+  async reserve(input: TalentAdvisoryReserveInputV1): Promise<TalentAdvisoryReserveDecisionV1> {
+    const snapshotInput = snapshotAdvisoryStoreInputV1(input);
+    const { context, executionBinding } = snapshotInput;
+    const identity = buildTalentReceiptIdentityV1(context);
+    const reference = this.firestore.collection(TALENT_RECEIPT_COLLECTION_V1).doc(identity.documentId);
+    if (reference.id !== identity.documentId) return invariant("Advisory receipt reference mismatch.");
+    const reservationId = this.reservationIdFactory();
+
+    return this.firestore.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(reference);
+      const now = this.nowMillis();
+      if (!snapshot.exists) {
+        const receipt = createTalentAdvisoryReservedReceiptV1(context, executionBinding, now, reservationId);
+        transaction.create(reference, encodeAdvisoryReceiptDocumentV1(receipt));
+        return Object.freeze({ kind: "RESERVED_OWNER", documentId: identity.documentId, receipt });
+      }
+      const document = decodeAdvisoryReceiptDocumentV1(snapshot.data());
+      const decision = classifyTalentAdvisoryReceiptV1(document, context, executionBinding, now);
+      if (decision.kind === "OUTCOME_UNKNOWN") {
+        const receipt = parseTalentAdvisoryReceiptV1(document);
+        if (receipt.state === "RESERVED" && receipt.leaseExpiresAt <= now) {
+          transaction.update(reference, Object.freeze({ state: "OUTCOME_UNKNOWN", updatedAt: new Date(now) }));
+        }
+      }
+      return decision;
+    });
+  }
+
+  async finalize(input: TalentAdvisoryFinalizeInputV1): Promise<TalentAdvisoryFinalizedAcknowledgmentV1> {
+    const raw = exactTalentAIRecordV1(snapshotTalentAIJsonV1(input, 327_680, "SCHEMA_VIOLATION"), [
+      "context", "executionBinding", "reservationId", "terminalHttpStatus", "terminalOutcomeCode", "terminalBody",
+    ]);
+    const { context, executionBinding } = snapshotAdvisoryStoreInputV1({
+      context: raw.context, executionBinding: raw.executionBinding,
+    });
+    if (raw.terminalHttpStatus !== 200 || raw.terminalOutcomeCode !== "ADVISORY_DELIVERED" ||
+        typeof raw.reservationId !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(raw.reservationId)) {
+      return invariant("Invalid advisory finalization input.");
+    }
+    const reservationId = raw.reservationId;
+    const terminalBody = validateTalentAdvisoryBodyV1(raw.terminalBody, context.canonicalRequest);
+    const identity = buildTalentReceiptIdentityV1(context);
+    const reference = this.firestore.collection(TALENT_RECEIPT_COLLECTION_V1).doc(identity.documentId);
+    if (reference.id !== identity.documentId) return invariant("Advisory receipt reference mismatch.");
+
+    // The transaction promise acknowledges only committed state, not a callback's tentative result.
+    const acknowledgment = await this.firestore.runTransaction<TalentAdvisoryFinalizedAcknowledgmentV1 | null>(async (transaction) => {
+      const snapshot = await transaction.get(reference);
+      if (!snapshot.exists) return invariant("Advisory receipt missing during finalization.");
+      const now = this.nowMillis();
+      const receipt = validateTalentAdvisoryReceiptV1(
+        decodeAdvisoryReceiptDocumentV1(snapshot.data()), context, executionBinding, reference.id, now,
+      );
+      if (receipt.state !== "RESERVED" || receipt.reservationId !== reservationId) {
+        return invariant("Advisory reservation ownership or state mismatch.");
+      }
+      if (receipt.leaseExpiresAt <= now) {
+        transaction.update(reference, Object.freeze({ state: "OUTCOME_UNKNOWN", updatedAt: new Date(now) }));
+        return null;
+      }
+      const finalized = validateTalentAdvisoryReceiptV1(Object.freeze({
+        ...receipt, state: "FINALIZED", updatedAt: now,
+        terminalHttpStatus: 200, terminalOutcomeCode: "ADVISORY_DELIVERED", terminalBody,
+      }), context, executionBinding, reference.id, now);
+      if (finalized.state !== "FINALIZED") return invariant("Invalid advisory finalization state.");
+      transaction.update(reference, Object.freeze({
+        state: "FINALIZED", updatedAt: new Date(now),
+        terminalHttpStatus: 200, terminalOutcomeCode: "ADVISORY_DELIVERED", terminalBody,
+      }));
+      return Object.freeze({ documentId: reference.id, receipt: finalized });
+    });
+    // Throwing inside the callback would abort the expired-state update.
+    if (acknowledgment === null) return invariant("Advisory reservation lease expired.");
+    return acknowledgment;
   }
 }
