@@ -21,6 +21,26 @@ import { executiveContentBriefMockService } from '../services/executiveContentBr
 export const useGrowthConversation = () => {
   const [conversation, setConversation] = useState<GrowthConversation | null>(null);
   const [turns, setTurns] = useState<GrowthConversationTurn[]>([]);
+
+  const contextualizeTurns = (
+    conversationTurns: GrowthConversationTurn[],
+  ): GrowthConversationTurn[] => {
+    if (conversationTurns.length === 0) {
+      return conversationTurns;
+    }
+
+    return conversationTurns.map((turn, index) => {
+      if (index !== 0 || turn.role !== 'assistant') {
+        return turn;
+      }
+
+      return {
+        ...turn,
+        content:
+          '¡Hola! Soy tu asistente de Aura Growth Studio™. Para empezar, ¿qué producto, servicio o línea de negocio quieres impulsar?',
+      };
+    });
+  };
   const [objective, setObjective] = useState<GrowthObjective | null>(null);
   const [brandBrain, setBrandBrain] = useState<BrandBrain | null>(null);
   const [campaignStrategy, setCampaignStrategy] = useState<CampaignStrategy | null>(null);
@@ -42,7 +62,7 @@ export const useGrowthConversation = () => {
       });
       setConversation(conv);
       const convTurns = await growthConversationService.getConversationTurns(conv.id);
-      setTurns(convTurns);
+      setTurns(contextualizeTurns(convTurns));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al iniciar la conversación');
     } finally {
@@ -69,14 +89,14 @@ export const useGrowthConversation = () => {
 
       // Update UI with user turn immediately
       let updatedTurns = await growthConversationService.getConversationTurns(conversation.id);
-      setTurns(updatedTurns);
+      setTurns(contextualizeTurns(updatedTurns));
 
       // 2. Generate assistant response
       await growthConversationService.generateAssistantResponse(conversation.id);
 
       // Update UI with assistant turn and new conversation state
       updatedTurns = await growthConversationService.getConversationTurns(conversation.id);
-      setTurns(updatedTurns);
+      setTurns(contextualizeTurns(updatedTurns));
 
       const updatedConv = await growthConversationService.getConversation(conversation.id);
       if (updatedConv) {

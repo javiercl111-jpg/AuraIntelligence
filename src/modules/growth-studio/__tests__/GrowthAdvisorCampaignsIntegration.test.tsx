@@ -142,6 +142,12 @@ describe(
               'Escribe tu respuesta...',
             ),
           ).toBeInTheDocument();
+
+          expect(
+            screen.getByText(
+              /producto, servicio o línea de negocio quieres impulsar/i,
+            ),
+          ).toBeInTheDocument();
         });
 
         const input =
@@ -190,17 +196,17 @@ describe(
 
         await submitAnswer(
           'Quiero vender Aura HCM',
-          /producto, servicio o línea de negocio quieres impulsar/i,
+          /audiencia objetivo a la que nos dirigimos/i,
         );
 
         await submitAnswer(
           'Hoteles',
-          /audiencia o segmento deseas llegar/i,
+          /región o mercado específico nos enfocaremos/i,
         );
 
         await submitAnswer(
           'México',
-          /región o mercado quieres concentrar esta estrategia/i,
+          /qué resultado medible esperas obtener/i,
         );
 
         await submitAnswer(
@@ -217,13 +223,13 @@ describe(
 
         await submitAnswer(
           'LinkedIn, Email',
-          /acción quieres que realice la audiencia después de ver el contenido/i,
+          /llamado a la acción principal de la campaña/i,
         );
 
         await waitFor(() => {
           expect(
             screen.getByText(
-              /acción quieres que realice la audiencia después de ver el contenido/i,
+              /llamado a la acción principal de la campaña/i,
             ),
           ).toBeInTheDocument();
         });
