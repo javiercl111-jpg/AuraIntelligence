@@ -33,6 +33,9 @@ import {
   TalentTenantMismatchErrorV1,
   type TalentTenantRegistryV1,
 } from "./talentTenantAuthorityV1.js";
+import type { TalentAdvisoryDeliveryBoundaryV1 } from "./talentAdvisoryDeliveryV1.js";
+import { validateTalentAdvisoryBodyV1 } from "./talentAdvisoryResponseV1.js";
+import { exactTalentAIRecordV1, snapshotTalentAIJsonV1 } from "./talentAIRuntimeContractsV1.js";
 
 export interface TalentEndpointRequestV1 {
   readonly method?: string;
@@ -53,6 +56,7 @@ export interface TalentEndpointDependenciesV1 {
   readonly createTenantRegistry: () => TalentTenantRegistryV1;
   readonly createReceiptStore: () => TalentReceiptStoreV1;
   readonly createExecutionBoundary: () => TalentExecutionBoundaryV1;
+  readonly createAdvisoryDeliveryBoundary?: () => TalentAdvisoryDeliveryBoundaryV1;
 }
 
 function sendError(
@@ -188,6 +192,38 @@ export async function talentEndpointV1(
   });
 
   try {
+    const createDelivery = dependencies.createAdvisoryDeliveryBoundary;
+    if (createDelivery !== undefined) {
+      const delivery = createDelivery();
+      const outcome = snapshotTalentAIJsonV1(
+        await delivery.deliver(receiptContext), 65_536, "SCHEMA_VIOLATION",
+      );
+      if (typeof outcome !== "object" || outcome === null || Array.isArray(outcome)) {
+        sendError(response, "INTERNAL_FAILURE", requestId, correlationId);
+        return;
+      }
+      const record = outcome as Record<string, unknown>;
+      if (record.kind === "DELIVERED") {
+        exactTalentAIRecordV1(record, ["kind", "terminalBody"]);
+        const terminalBody = validateTalentAdvisoryBodyV1(record.terminalBody, canonicalRequest);
+        response.statusCode = 200;
+        response.setHeader("Content-Type", "application/json");
+        response.setHeader("Cache-Control", "no-store");
+        response.end(terminalBody);
+        return;
+      }
+      exactTalentAIRecordV1(record, ["kind", "code"]);
+      if (record.kind === "FAILED" && (
+        record.code === "IDEMPOTENCY_CONFLICT" || record.code === "IDEMPOTENCY_IN_PROGRESS" ||
+        record.code === "OUTCOME_UNKNOWN" || record.code === "INTERNAL_FAILURE"
+      )) {
+        sendError(response, record.code, requestId, correlationId);
+        return;
+      }
+      sendError(response, "INTERNAL_FAILURE", requestId, correlationId);
+      return;
+    }
+
     const receiptStore = dependencies.createReceiptStore();
     const decision = await receiptStore.reserve(receiptContext);
 
