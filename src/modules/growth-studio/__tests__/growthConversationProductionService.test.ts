@@ -317,7 +317,7 @@ describe(
     );
 
     it(
-      'CASE6 maps server nextQuestion into the local assistant turn',
+      'CASE6 keeps local stage question authoritative over remote nextQuestion',
       async () => {
         const service =
           new GrowthConversationProductionService();
@@ -334,8 +334,12 @@ describe(
           'assistant',
         );
 
-        expect(assistantTurn.content).toBe(
+        expect(assistantTurn.content).not.toBe(
           SERVER_QUESTION,
+        );
+
+        expect(assistantTurn.content).toMatch(
+          /audiencia|segmento/i,
         );
       },
     );
@@ -418,7 +422,7 @@ describe(
             (turn) =>
               turn.id === assistantTurn.id &&
               turn.role === 'assistant' &&
-              turn.content === SERVER_QUESTION,
+              /audiencia|segmento/i.test(turn.content),
           ),
         ).toBe(true);
       },
