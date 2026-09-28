@@ -115,6 +115,11 @@ describe('ExecutiveConversationPage', () => {
     const input = screen.getByPlaceholderText('Escribe tu respuesta...');
     const submitBtn = screen.getByRole('button', { name: /enviar/i });
 
+    // Wait for initial conversation startup to finish before testing submit locking.
+    await waitFor(() => {
+      expect(input).not.toBeDisabled();
+    });
+
     fireEvent.change(input, { target: { value: 'Mi objetivo' } });
 
     // First submit
@@ -197,7 +202,7 @@ describe('ExecutiveConversationPage', () => {
     // Enviar Audiencia (Hoteles)
     await waitFor(() => {
       expect(
-        screen.getByText(/audiencia o segmento deseas llegar/i),
+        screen.getByText(/audiencia objetivo a la que nos dirigimos/i),
       ).toBeInTheDocument();
       expect(input).not.toBeDisabled();
     });
@@ -207,7 +212,7 @@ describe('ExecutiveConversationPage', () => {
     // Enviar Región (México)
     await waitFor(() => {
       expect(
-        screen.getByText(/región o mercado quieres concentrar esta estrategia/i),
+        screen.getByText(/región o mercado específico nos enfocaremos/i),
       ).toBeInTheDocument();
       expect(input).not.toBeDisabled();
     });
@@ -215,7 +220,7 @@ describe('ExecutiveConversationPage', () => {
     fireEvent.click(submitBtn);
     await waitFor(() => {
       expect(
-        screen.getByText(/resultado|objetivo/i),
+        screen.getByText(/resultado medible esperas obtener/i),
       ).toBeInTheDocument();
       expect(input).not.toBeDisabled();
     });
@@ -241,7 +246,7 @@ describe('ExecutiveConversationPage', () => {
     // Después de canales, el flujo solicita el CTA principal.
     await waitFor(() => {
       expect(
-        screen.getByText(/¿Qué acción quieres que realice la audiencia después de ver el contenido/i),
+        screen.getByText(/llamado a la acción principal de la campaña/i),
       ).toBeInTheDocument();
       expect(input).not.toBeDisabled();
     });
