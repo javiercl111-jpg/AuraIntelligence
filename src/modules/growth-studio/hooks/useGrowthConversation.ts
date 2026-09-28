@@ -3,6 +3,8 @@
 // ─────────────────────────────────────────────────────────────
 
 import { useState, useCallback } from 'react';
+import type { AuraRuntimeContext } from '../../../types/auraContext';
+import { GrowthContextBootstrap } from '../services/GrowthContextBootstrap';
 import type { GrowthConversation, GrowthConversationTurn } from '../types/growthConversation';
 import type { GrowthObjective } from '../types/growthObjective';
 import type { BrandBrain } from '../types/brandBrain';
@@ -18,7 +20,7 @@ import { contentPlanMockService } from '../services/contentPlanMockService';
 import type { ExecutiveContentBrief } from '../types/executiveContentBrief';
 import { executiveContentBriefMockService } from '../services/executiveContentBriefMockService';
 
-export const useGrowthConversation = () => {
+export const useGrowthConversation = (runtimeContext?: AuraRuntimeContext) => {
   const [conversation, setConversation] = useState<GrowthConversation | null>(null);
   const [turns, setTurns] = useState<GrowthConversationTurn[]>([]);
   const [objective, setObjective] = useState<GrowthObjective | null>(null);
@@ -35,10 +37,19 @@ export const useGrowthConversation = () => {
     setIsTyping(true);
     setError(null);
     try {
+      if (!runtimeContext) {
+        throw new Error('Growth Advisor requires authenticated runtime context');
+      }
+
+      const bootstrap = GrowthContextBootstrap.resolve({
+        runtimeContext,
+        scope: 'company',
+      });
+
       const conv = await growthConversationService.startConversation({
-        tenantId: 'growth_demo_tenant',
-        companyId: 'growth_demo_company',
-        userId: 'growth_demo_user',
+        tenantId: bootstrap.runtimeContext.tenantId,
+        companyId: bootstrap.runtimeContext.companyId,
+        userId: bootstrap.runtimeContext.userId,
       });
       setConversation(conv);
       const convTurns = await growthConversationService.getConversationTurns(conv.id);
@@ -49,7 +60,7 @@ export const useGrowthConversation = () => {
       setIsTyping(false);
       setLoading(false);
     }
-  }, []);
+  }, [runtimeContext]);
 
   const addTurn = useCallback(async (content: string) => {
     if (!conversation) return;
