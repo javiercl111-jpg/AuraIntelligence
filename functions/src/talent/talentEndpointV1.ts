@@ -55,7 +55,7 @@ export interface TalentEndpointDependenciesV1 {
   readonly readProjectId: () => string | undefined;
   readonly createTenantRegistry: () => TalentTenantRegistryV1;
   readonly createReceiptStore: () => TalentReceiptStoreV1;
-  readonly createExecutionBoundary: () => TalentExecutionBoundaryV1;
+  readonly createExecutionBoundary: (input: TalentExecutionInputV1) => TalentExecutionBoundaryV1;
   readonly createAdvisoryDeliveryBoundary?: () => TalentAdvisoryDeliveryBoundaryV1;
 }
 
@@ -267,7 +267,7 @@ export async function talentEndpointV1(
       canonicalRequest,
     });
 
-    const executionBoundary = dependencies.createExecutionBoundary();
+    const executionBoundary = dependencies.createExecutionBoundary(executionInput);
     const executionOutcome = await executionBoundary.execute(executionInput);
 
     if (executionOutcome.kind !== "EXECUTED") {
