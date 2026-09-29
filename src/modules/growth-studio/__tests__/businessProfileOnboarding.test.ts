@@ -269,7 +269,8 @@ describe.each([
     expect((await service.getConversationTurns(conv.id))[0].content).toContain('Los cambios realizados aquí');
   });
 
-  it('03B: hydrated company/catalog skip repeat questions and selected product keeps the workflow', async () => {
+  it.each(['known', 'partial', 'empty', 'new product'] as const)(
+    '03C: %s hydrated context asks only for missing knowledge without persistence writes', async scenario => {
     const source = knownBusinessProfile({ ...scope, tenantId: 'tenant-z' });
     const missing = { value: null, status: 'missing' as const, confidence: 0, evidenceIds: [] };
     const enterprise: EnterpriseCommercialContext = {
@@ -288,17 +289,65 @@ describe.each([
     session.companyName = undefined;
     session.businessDescription = undefined;
     session.products = [];
-    const repo = { readEnterpriseContext: vi.fn().mockResolvedValue(snapshot.enterprise), readProductContexts: vi.fn().mockResolvedValue(snapshot.products) };
-    const hydrated = await GrowthContextBootstrap.hydrate({ runtimeContext: TEST_RUNTIME, businessProfile: session, repository: repo });
+    session.catalogReviewed = undefined;
+    const canonicalBefore = structuredClone(snapshot);
+    const repo = {
+      readEnterpriseContext: vi.fn().mockResolvedValue(scenario === 'empty' ? null : snapshot.enterprise),
+      readProductContexts: vi.fn().mockResolvedValue(scenario === 'empty' || scenario === 'partial' ? [] : snapshot.products),
+      createEnterpriseContext: vi.fn(), updateEnterpriseContext: vi.fn(),
+      createProductContext: vi.fn(), updateProductContext: vi.fn(),
+    };
+    const hydrated = await GrowthContextBootstrap.hydrate({
+      runtimeContext: TEST_RUNTIME, businessProfile: scenario === 'empty' ? undefined : session, repository: repo,
+    });
     const conv = await service.startConversation({ ...scope, businessProfile: hydrated.businessProfile });
-    expect(conv.currentStage).toBe('selecting_growth_scope');
-    expect((await service.getConversationTurns(conv.id))[0].content).not.toMatch(/llama tu empresa|dedica tu empresa|Qué productos o servicios ofrece/);
-    const selected = await answer(service, conv.id, 'Aura HCM');
-    expect(selected.state.currentStage).toBe('understanding_audience');
-    expect(selected.state.structuredContext.selectedProductId).toBe('product-0');
-    expect(selected.profile.products[0].tenantId).toBe('tenant-z');
-    expect(repo.readEnterpriseContext).toHaveBeenCalledTimes(1);
-    expect(repo.readProductContexts).toHaveBeenCalledTimes(1);
+    const initial = (await service.getConversationTurns(conv.id))[0].content;
+    if (scenario === 'empty') {
+      expect(initial).toContain('¿Cuál es tu nombre?');
+      expect((await answer(service, conv.id, 'Javier')).turn.content).toContain('función');
+      expect((await answer(service, conv.id, 'Director')).turn.content).toContain('llama tu empresa');
+      expect((await answer(service, conv.id, 'Aura Nexus')).turn.content).toContain('dedica tu empresa');
+      expect((await answer(service, conv.id, 'Software')).state.currentStage).toBe('understanding_catalog');
+    } else if (scenario === 'partial') {
+      expect(conv.currentStage).toBe('understanding_catalog');
+      expect(initial).toContain('¿Qué productos o servicios ofrece tu empresa?');
+      expect(initial).not.toMatch(/llama tu empresa|dedica tu empresa|Cuál es tu nombre|función desempeñas/);
+      const proposed = await answer(service, conv.id, 'Aura Payroll');
+      expect(proposed.state.currentStage).toBe('confirming_knowledge_update');
+      expect((await answer(service, conv.id, 'Sí')).state.currentStage).toBe('selecting_growth_scope');
+    } else if (scenario === 'new product') {
+      expect(conv.currentStage).toBe('selecting_growth_scope');
+      const proposed = await answer(service, conv.id, 'Quiero lanzar Aura Payroll');
+      expect(proposed.turn.content).toContain('todavía no está registrado');
+      expect(proposed.profile.products).toHaveLength(snapshot.products.length);
+      expect((await answer(service, conv.id, 'Sí')).state.currentStage).toBe('understanding_product_description');
+      const added = await answer(service, conv.id, 'Automatiza la nómina');
+      expect(added.state.currentStage).toBe('understanding_audience');
+      expect(added.profile.products).toHaveLength(snapshot.products.length + 1);
+      expect(added.profile.products.at(-1)).toMatchObject({
+        name: { value: 'Aura Payroll' }, description: { value: 'Automatiza la nómina' },
+      });
+      const nextHydration = await GrowthContextBootstrap.hydrate({ runtimeContext: TEST_RUNTIME, repository: repo });
+      expect(nextHydration.businessProfile.products.map(product => product.name.value)).not.toContain('Aura Payroll');
+    } else {
+      expect(conv.currentStage).toBe('selecting_growth_scope');
+      expect(initial).not.toMatch(/llama tu empresa|dedica tu empresa|Qué productos o servicios ofrece/);
+      const selected = await answer(service, conv.id, 'Aura HCM');
+      expect(selected.state.currentStage).toBe('understanding_audience');
+      expect(selected.state.structuredContext.selectedProductId).toBe('product-0');
+      expect(selected.profile.products[0].tenantId).toBe('tenant-z');
+      expect(selected.turn.content).toContain('audiencia objetivo');
+      expect(selected.profile.products[0].description).toEqual(hydrated.businessProfile.products[0].description);
+      expect(selected.profile.products[0].description?.value).toBe('Software Aura HCM');
+    }
+    expect(repo.readEnterpriseContext).toHaveBeenCalledTimes(scenario === 'new product' ? 2 : 1);
+    expect(repo.readProductContexts).toHaveBeenCalledTimes(scenario === 'new product' ? 2 : 1);
+    expect(repo.readEnterpriseContext).toHaveBeenCalledWith({ companyId: 'company-a' });
+    expect(repo.readProductContexts).toHaveBeenCalledWith({ companyId: 'company-a' });
+    expect(snapshot).toEqual(canonicalBefore);
+    for (const write of [repo.createEnterpriseContext, repo.updateEnterpriseContext, repo.createProductContext, repo.updateProductContext]) {
+      expect(write).not.toHaveBeenCalled();
+    }
   });
 
   it('uses a provided runtime name and still asks for the business role', async () => {
