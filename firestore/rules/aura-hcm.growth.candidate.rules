@@ -1,0 +1,1227 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // AGFC01: administratively provisioned Growth identity.
+    // Client may read only its own identity document.
+    match /growth_identities/{uid} {
+      allow get: if request.auth != null
+                 && request.auth.uid == uid;
+    }
+
+
+    // --- Helpers de Autenticaci f³n B f¡sica ---
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function hasCompanyId() {
+      return request.resource != null
+        && request.resource.data.keys().hasAny(['companyId']);
+    }
+
+    // --- Helpers de Carga de Perfil del Usuario (Fail-Closed) ---
+    function hasUserData() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getUserRole() {
+      return hasUserData() ? getUserData().role : 'EMPLOYEE';
+    }
+
+    function getUserProfileId() {
+      return hasUserData() ? getUserData().profileId : 'employee';
+    }
+
+    function getUserCompanyId() {
+      return hasUserData() && getUserData().companyId != null ? getUserData().companyId : 'INVALID_COMPANY_ID';
+    }
+
+    function getUserEmployeeId() {
+      return hasUserData() && getUserData().employeeId != null ? getUserData().employeeId : 'INVALID_EMPLOYEE_ID';
+    }
+
+    // --- Helpers de Validaci f³n Multi-Tenant ---
+    function isCompanyUser(companyId) {
+      return isAuthenticated() && getUserCompanyId() == companyId;
+    }
+
+    function isResourceCompany() {
+      return isAuthenticated() && (
+        resource != null && resource.data != null && 
+        resource.data.companyId == getUserCompanyId()
+      );
+    }
+
+    function isRequestCompany() {
+      return isAuthenticated() && (
+        request.resource != null && request.resource.data != null && 
+        request.resource.data.companyId == getUserCompanyId()
+      );
+    }
+
+    // --- Helpers de Roles y Permisos ---
+    function isSuperAdmin() {
+      return isAuthenticated() && (
+        getUserRole() == 'SUPER_ADMIN' || 
+        getUserProfileId() == 'super-admin'
+      );
+    }
+
+    function isHR() {
+      return isAuthenticated() && (
+        getUserRole() == 'RH' || 
+        getUserRole() == 'HR_ADMIN' || 
+        getUserRole() == 'HR_MANAGER' || 
+        getUserProfileId() == 'rh' || 
+        getUserProfileId() == 'hr-admin' || 
+        getUserProfileId() == 'hr-manager'
+      );
+    }
+
+    function isPayrollAdmin() {
+      return isAuthenticated() && (
+        getUserRole() == 'PAYROLL_ADMIN' ||
+        getUserProfileId() == 'payroll-admin'
+      );
+    }
+
+    function isSalesManager() {
+      return isAuthenticated() && (
+        getUserRole() == 'SALES_MANAGER' ||
+        getUserProfileId() == 'sales-manager'
+      );
+    }
+
+    function isSalesEmployee() {
+      return isAuthenticated() && (
+        getUserRole() == 'SALES_EMPLOYEE' ||
+        getUserProfileId() == 'sales-employee'
+      );
+    }
+
+    function isDirector() {
+      return isAuthenticated() && (
+        getUserRole() == 'DIRECTOR' || 
+        getUserRole() == 'DIRECTOR_GENERAL' ||
+        getUserProfileId() == 'director' ||
+        getUserProfileId() == 'director-general'
+      );
+    }
+
+    function getEmployeeData(employeeId) {
+      return get(/databases/$(database)/documents/employees/$(employeeId)).data;
+    }
+
+    function isAssociatedEmployee(employeeId) {
+      return employeeId != null && employeeId != '' && 
+        exists(/databases/$(database)/documents/employees/$(employeeId)) && (
+        getEmployeeData(employeeId).userId == request.auth.uid ||
+        getEmployeeData(employeeId).uid == request.auth.uid ||
+        getEmployeeData(employeeId).email == request.auth.token.email
+      );
+    }
+
+    function isOwnEmployee(employeeId, employeeData) {
+      return isAuthenticated() && (
+        request.auth.uid == employeeId ||
+        (hasUserData() && getUserData().employeeId == employeeId) ||
+        (employeeData != null && (
+          ('userId' in employeeData && employeeData.userId == request.auth.uid) ||
+          ('uid' in employeeData && employeeData.uid == request.auth.uid)
+        ))
+      );
+    }
+
+    function isValidEmployeeIdentity(targetEmployeeId) {
+      return isAuthenticated() && hasUserData() && targetEmployeeId != null && targetEmployeeId != '' && (
+        // 1. Direct matches against auth token and user record metadata
+        targetEmployeeId == getUserEmployeeId() ||
+        targetEmployeeId == request.auth.uid ||
+        (request.auth.token.email != null && targetEmployeeId == request.auth.token.email) ||
+        
+        // 2. Lookup employee record using user's canonical employeeId
+        (
+          getUserEmployeeId() != null && getUserEmployeeId() != '' && getUserEmployeeId() != 'INVALID_EMPLOYEE_ID' &&
+          exists(/databases/$(database)/documents/employees/$(getUserEmployeeId())) && (
+            getEmployeeData(getUserEmployeeId()).companyId == getUserCompanyId() &&
+            (
+              getEmployeeData(getUserEmployeeId()).uid == request.auth.uid || 
+              getEmployeeData(getUserEmployeeId()).userId == request.auth.uid
+            ) && (
+              targetEmployeeId == getEmployeeData(getUserEmployeeId()).employeeId ||
+              targetEmployeeId == getEmployeeData(getUserEmployeeId()).employeeNumber ||
+              targetEmployeeId == getEmployeeData(getUserEmployeeId()).id ||
+              (getEmployeeData(getUserEmployeeId()).email != null && targetEmployeeId == getEmployeeData(getUserEmployeeId()).email)
+            )
+          )
+        ) ||
+        
+        // 3. Fallback: Lookup employee record using targetEmployeeId directly
+        (
+          targetEmployeeId != 'INVALID_EMPLOYEE_ID' &&
+          exists(/databases/$(database)/documents/employees/$(targetEmployeeId)) && (
+            getEmployeeData(targetEmployeeId).companyId == getUserCompanyId() &&
+            (
+              getEmployeeData(targetEmployeeId).uid == request.auth.uid ||
+              getEmployeeData(targetEmployeeId).userId == request.auth.uid ||
+              (getEmployeeData(targetEmployeeId).email != null && request.auth.token.email != null && getEmployeeData(targetEmployeeId).email == request.auth.token.email) ||
+              (getEmployeeData(targetEmployeeId).email != null && getUserData().email != null && getEmployeeData(targetEmployeeId).email == getUserData().email)
+            )
+          )
+        )
+      );
+    }
+
+    function isOwnRecord(employeeId) {
+      return isValidEmployeeIdentity(employeeId);
+    }
+
+    function isOwnData(data) {
+      return isAuthenticated() && data != null && (
+        ('employeeId' in data && isValidEmployeeIdentity(data.employeeId)) ||
+        ('userId' in data && data.userId == request.auth.uid) ||
+        ('uid' in data && data.uid == request.auth.uid) ||
+        ('email' in data && data.email == request.auth.token.email)
+      );
+    }
+
+    // F6B: canonical ACTIVE direct-report authority for Executive Dashboard V2.
+    // RH authority wins over leader-like role/profile signals.
+    function isExecutiveDashboardLeader() {
+      let role = getUserData().get('role', '');
+      let profileId = getUserData().get('profileId', '');
+      return isAuthenticated() && hasUserData() &&
+        !(role in ['RH', 'HR_ADMIN', 'HR_MANAGER']) &&
+        !(profileId in ['rh', 'hr-admin', 'hr-manager']) && (
+        role in ['DIRECTOR', 'MANAGER', 'TEAMLEADER', 'TEAM_LEADER', 'SUBLEADER', 'SUB_LEADER'] ||
+        profileId in ['director', 'manager', 'teamleader', 'team-leader', 'subleader', 'sub-leader']
+      );
+    }
+
+    function hasExecutiveDashboardIdentity() {
+      let employeeId = getUserEmployeeId();
+      let companyId = getUserCompanyId();
+      return employeeId is string && employeeId != '' &&
+        employeeId != 'INVALID_EMPLOYEE_ID' && companyId is string && companyId != '' &&
+        companyId != 'INVALID_COMPANY_ID' &&
+        exists(/databases/$(database)/documents/employees/$(employeeId)) &&
+        getEmployeeData(employeeId).companyId == companyId &&
+        getEmployeeData(employeeId).get('employeeId', employeeId) == employeeId &&
+        getEmployeeData(employeeId).get('status', '') == 'ACTIVE' &&
+        getEmployeeData(employeeId).get('isActive', true) == true &&
+        getEmployeeData(employeeId).get('reportsTo', '') != employeeId;
+    }
+
+    function isExecutiveDashboardDirectReport(employeeData) {
+      return employeeData != null &&
+        employeeData.get('companyId', '') == getUserCompanyId() &&
+        employeeData.get('status', '') == 'ACTIVE' &&
+        employeeData.get('isActive', true) == true &&
+        employeeData.get('reportsTo', '') == getUserEmployeeId();
+    }
+
+    function canReadExecutiveDashboardRecord(data) {
+      let employeeId = data.get('employeeId', '');
+      return employeeId is string && employeeId != '' &&
+        data.get('companyId', '') == getUserCompanyId() &&
+        exists(/databases/$(database)/documents/employees/$(employeeId)) &&
+        getEmployeeData(employeeId).get('employeeId', employeeId) == employeeId &&
+        isExecutiveDashboardDirectReport(getEmployeeData(employeeId));
+    }
+
+    // --- REGLAS POR COLECCI f ?oN ---
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        request.auth.uid == userId || 
+        (resource != null && (
+          resource.data.companyId == getUserCompanyId() ||
+          resource.data.email == request.auth.token.email
+        ))
+      );
+      allow write: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (request.auth.uid == userId &&
+         isAssociatedEmployee(request.resource.data.employeeId) &&
+         request.resource.data.role == getEmployeeData(request.resource.data.employeeId).role &&
+         request.resource.data.profileId == getEmployeeData(request.resource.data.employeeId).profileId &&
+         request.resource.data.companyId == getEmployeeData(request.resource.data.employeeId).companyId)
+      );
+    }
+
+    match /employees/{employeeId} {
+      allow get: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (isExecutiveDashboardLeader() ? (
+          hasExecutiveDashboardIdentity() && (
+            (employeeId == getUserEmployeeId() && isResourceCompany()) ||
+            isExecutiveDashboardDirectReport(resource.data)
+          )
+        ) : (
+          isOwnEmployee(employeeId, resource.data) ||
+          isOwnData(resource.data) ||
+          (isResourceCompany() && (
+            isHR() ||
+            isPayrollAdmin() ||
+            isDirector()
+          ))
+        ))
+      );
+      allow list: if isAuthenticated() && 
+        hasUserData() && 
+        getUserCompanyId() != 'INVALID_COMPANY_ID' && (
+          isSuperAdmin() || (
+            isExecutiveDashboardLeader() ?
+              (hasExecutiveDashboardIdentity() &&
+                isExecutiveDashboardDirectReport(resource.data)) : (
+              resource != null &&
+              'companyId' in resource.data &&
+              resource.data.companyId == getUserCompanyId() && (
+                isHR() ||
+                isPayrollAdmin() ||
+                isDirector() || (
+                  'userId' in resource.data &&
+                  resource.data.userId == request.auth.uid
+                )
+              )
+            )
+          )
+        );
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (isHR() && 
+         request.resource.data.companyId == getUserCompanyId() &&
+         request.resource.data.role != 'SUPER_ADMIN' &&
+         request.resource.data.profileId != 'super-admin' &&
+         request.resource.data.perfil != 'super-admin')
+      ) && !request.resource.data.keys().hasAny(['password', 'plainPassword', 'tempPassword', 'temporaryPassword']);
+      allow update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (isHR() && 
+         resource.data.companyId == getUserCompanyId() && 
+         request.resource.data.companyId == getUserCompanyId() &&
+         request.resource.data.role != 'SUPER_ADMIN' &&
+         request.resource.data.profileId != 'super-admin' &&
+         request.resource.data.perfil != 'super-admin') ||
+        (isOwnEmployee(employeeId, resource.data) &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+           'role', 'profileId', 'perfil', 'companyId', 'department', 'position', 
+           'permissions', 'isSuperAdmin', 'status', 'isActive', 'salary', 'compensation'
+         ]))
+      ) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['password', 'plainPassword', 'tempPassword', 'temporaryPassword']);
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /public_profiles/{publicToken} {
+      allow read: if (resource != null && resource.data.status == 'active') || (
+        isAuthenticated() && (
+          isSuperAdmin() ||
+          isHR() ||
+          (resource != null && resource.data.employeeId == getUserEmployeeId())
+        )
+      );
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() ||
+        isHR() ||
+        request.resource.data.employeeId == getUserEmployeeId()
+      );
+      allow update: if (
+        isAuthenticated() && (
+          isSuperAdmin() ||
+          isHR() ||
+          (resource != null && resource.data.employeeId == getUserEmployeeId() && request.resource.data.employeeId == getUserEmployeeId())
+        )
+      ) || (
+        resource != null && resource.data.status == 'active' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['analytics', 'lastDeviceType']) &&
+        request.resource.data.lastDeviceType in ['mobile', 'tablet', 'desktop', 'unknown'] &&
+        request.resource.data.analytics.lastViewedAt == request.time &&
+        request.resource.data.analytics.totalViews == (('analytics' in resource.data && 'totalViews' in resource.data.analytics) ? resource.data.analytics.totalViews : 0) + 1 &&
+        (
+          (
+            request.resource.data.analytics.qrViews == (('analytics' in resource.data && 'qrViews' in resource.data.analytics) ? resource.data.analytics.qrViews : 0) + 1 &&
+            request.resource.data.analytics.linkViews == (('analytics' in resource.data && 'linkViews' in resource.data.analytics) ? resource.data.analytics.linkViews : 0)
+          ) ||
+          (
+            request.resource.data.analytics.linkViews == (('analytics' in resource.data && 'linkViews' in resource.data.analytics) ? resource.data.analytics.linkViews : 0) + 1 &&
+            request.resource.data.analytics.qrViews == (('analytics' in resource.data && 'qrViews' in resource.data.analytics) ? resource.data.analytics.qrViews : 0)
+          )
+        )
+      );
+      allow delete: if isAuthenticated() && (
+        isSuperAdmin() ||
+        isHR() ||
+        (resource != null && resource.data.employeeId == getUserEmployeeId())
+      );
+    }
+
+
+    match /fcm_tokens/{tokenId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isResourceCompany() || isOwnData(resource.data));
+      allow create: if isAuthenticated() && isRequestCompany()
+        && request.resource.data.keys().hasAll(['employeeId', 'fcmToken'])
+        && isOwnRecord(request.resource.data.employeeId);
+      allow update: if isAuthenticated()
+        && isResourceCompany()
+        && isRequestCompany()
+        && isOwnRecord(resource.data.employeeId)
+        && request.resource.data.keys().hasAll(['employeeId', 'fcmToken'])
+        && isOwnRecord(request.resource.data.employeeId);
+      allow delete: if isAuthenticated()
+        && (isSuperAdmin() || (isResourceCompany() && isOwnData(resource.data)));
+    }
+
+    match /notifications/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isResourceCompany() || isOwnData(resource.data));
+      allow create: if isAuthenticated() && isRequestCompany() && (isSuperAdmin() || isHR());
+      allow update, delete: if isAuthenticated() && (isSuperAdmin() || (isResourceCompany() && isHR()));
+    }
+
+    match /notifications_log/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isResourceCompany());
+      allow create: if isAuthenticated() && isRequestCompany() && (isSuperAdmin() || isHR());
+      allow update, delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /acts/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        (isResourceCompany() && (isHR() || isOwnRecord(resource.data.employeeId)))
+      );
+      allow create, update: if isAuthenticated() && isRequestCompany() && (isSuperAdmin() || isHR());
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /admin_acts/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        (isResourceCompany() && (isHR() || isOwnRecord(resource.data.employeeId) || resource.data.employeeDocId == getUserEmployeeId()))
+      );
+      allow create, update: if isAuthenticated() && isRequestCompany() && (isSuperAdmin() || isHR());
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /admin_act_signatures/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        (isResourceCompany() && (isHR() || isOwnRecord(resource.data.employeeId)))
+      );
+      allow create, update: if isAuthenticated() && isRequestCompany();
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /teams/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isResourceCompany());
+      allow create, update: if isAuthenticated() && isRequestCompany() && (isSuperAdmin() || isHR());
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /tasks/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isResourceCompany());
+      allow create: if isAuthenticated() && isRequestCompany() && (isSuperAdmin() || isHR() || getUserRole() != 'EMPLOYEE');
+      allow update: if isAuthenticated() && (isSuperAdmin() || (isResourceCompany() && (isHR() || getUserRole() != 'EMPLOYEE' || isOwnRecord(resource.data.assignedTo.employeeId) || resource.data.employeeId == getUserEmployeeId())));
+      allow delete: if isAuthenticated() && (isSuperAdmin() || (isResourceCompany() && isHR()));
+    }
+
+    match /schedules/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isResourceCompany());
+      allow create, update: if isAuthenticated() && isRequestCompany() && (isSuperAdmin() || isHR());
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /system_announcements/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isResourceCompany());
+      allow write: if isAuthenticated() && isRequestCompany() && (isSuperAdmin() || isHR());
+    }
+
+    match /vacation_requests/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() ||
+        (isExecutiveDashboardLeader() ? (
+          hasExecutiveDashboardIdentity() && (
+            (isResourceCompany() && resource.data.get('employeeId', '') == getUserEmployeeId()) ||
+            canReadExecutiveDashboardRecord(resource.data)
+          )
+        ) : (
+          isOwnData(resource.data) ||
+          (isResourceCompany() && (
+            isHR() ||
+            isPayrollAdmin() ||
+            isOwnRecord(resource.data.employeeId) ||
+            resource.data.reportsTo == request.auth.uid ||
+            resource.data.supervisorId == getUserEmployeeId()
+          ))
+        ))
+      );
+      allow create: if isAuthenticated() && isRequestCompany() && (isSuperAdmin() || isHR() || isOwnRecord(request.resource.data.employeeId));
+      allow update: if isAuthenticated() && isRequestCompany() && isResourceCompany() && (isSuperAdmin() || isHR() || isOwnRecord(resource.data.employeeId) || resource.data.reportsTo == request.auth.uid || resource.data.supervisorId == getUserEmployeeId());
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /permission_requests/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() ||
+        (isExecutiveDashboardLeader() ? (
+          hasExecutiveDashboardIdentity() && (
+            (isResourceCompany() && resource.data.get('employeeId', '') == getUserEmployeeId()) ||
+            canReadExecutiveDashboardRecord(resource.data)
+          )
+        ) : (
+          isOwnData(resource.data) ||
+          (isResourceCompany() && (
+            isHR() ||
+            isPayrollAdmin() ||
+            isOwnRecord(resource.data.employeeId) ||
+            resource.data.reportsTo == request.auth.uid ||
+            resource.data.supervisorId == getUserEmployeeId()
+          ))
+        ))
+      );
+      allow create: if isAuthenticated() && isRequestCompany() && (isSuperAdmin() || isHR() || isOwnRecord(request.resource.data.employeeId));
+      allow update: if isAuthenticated() && isRequestCompany() && isResourceCompany() && (isSuperAdmin() || isHR() || isOwnRecord(resource.data.employeeId) || resource.data.reportsTo == request.auth.uid || resource.data.supervisorId == getUserEmployeeId());
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /incapacity_requests/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        isOwnData(resource.data) ||
+        (isResourceCompany() && (
+          isHR() || 
+          isPayrollAdmin() ||
+          isOwnRecord(resource.data.employeeId)
+        ))
+      );
+      allow create: if isAuthenticated() && isRequestCompany() && (isSuperAdmin() || isHR() || isOwnRecord(request.resource.data.employeeId));
+      allow update: if isAuthenticated() && isRequestCompany() && isResourceCompany() && (isSuperAdmin() || isHR() || isOwnRecord(resource.data.employeeId));
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    function validAttendanceCreate() {
+      return request.resource.data.status == 'WORKING' &&
+        request.resource.data.checkInAt != null &&
+        request.resource.data.lunchStartAt == null &&
+        request.resource.data.lunchEndAt == null &&
+        request.resource.data.checkOutAt == null;
+    }
+
+    function validLegacyIdleAttendanceAdoption() {
+      return
+        isOwnRecord(resource.data.employeeId) &&
+        resource.data.status == 'IDLE' &&
+        resource.data.get('authUid', null) == null &&
+        resource.data.get('source', '') == 'ATTENDANCE_FUNCTIONS_V2' &&
+        resource.data.get('checkIn', null) == null &&
+        resource.data.get('checkInAt', null) == null &&
+        resource.data.get('lunchStart', null) == null &&
+        resource.data.get('lunchEnd', null) == null &&
+        resource.data.get('checkOut', null) == null &&
+        request.resource.data.status == 'WORKING' &&
+        request.resource.data.authUid == request.auth.uid &&
+        request.resource.data.employeeId == resource.data.employeeId &&
+        request.resource.data.companyId == resource.data.companyId &&
+        request.resource.data.date == resource.data.date &&
+        request.resource.data.source == 'employee_attendance_widget' &&
+        request.resource.data.checkIn != null &&
+        request.resource.data.checkInAt != null &&
+        request.resource.data.get('lunchStart', null) == null &&
+        request.resource.data.get('lunchEnd', null) == null &&
+        request.resource.data.get('checkOut', null) == null &&
+        request.resource.data.lunchStartAt == null &&
+        request.resource.data.lunchEndAt == null &&
+        request.resource.data.checkOutAt == null;
+    }
+
+    function validAttendanceWorkflowTransition() {
+      return (
+        resource.data.status == 'WORKING' &&
+        request.resource.data.status == 'ON_BREAK' &&
+        resource.data.lunchStartAt == null &&
+        request.resource.data.lunchStartAt != null &&
+        request.resource.data.lunchEndAt == resource.data.lunchEndAt &&
+        request.resource.data.checkOutAt == resource.data.checkOutAt
+      ) || (
+        resource.data.status == 'ON_BREAK' &&
+        request.resource.data.status == 'WORKING' &&
+        resource.data.lunchStartAt != null &&
+        resource.data.lunchEndAt == null &&
+        request.resource.data.lunchStartAt == resource.data.lunchStartAt &&
+        request.resource.data.lunchEndAt != null &&
+        request.resource.data.checkOutAt == resource.data.checkOutAt
+      ) || (
+        resource.data.status == 'WORKING' &&
+        request.resource.data.status == 'FINISHED' &&
+        resource.data.checkInAt != null &&
+        resource.data.checkOutAt == null &&
+        request.resource.data.checkInAt == resource.data.checkInAt &&
+        request.resource.data.lunchStartAt == resource.data.lunchStartAt &&
+        request.resource.data.lunchEndAt == resource.data.lunchEndAt &&
+        request.resource.data.checkOutAt != null
+      );
+    }
+
+    match /attendance/{docId} {
+      allow get: if isAuthenticated() &&
+        !exists(/databases/$(database)/documents/attendance/$(docId)) &&
+        docId.matches(
+          '^' +
+          getUserCompanyId() + '_' +
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.employeeId +
+          '_[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+        );
+
+      allow read: if isAuthenticated() && (isSuperAdmin() ||
+        (isExecutiveDashboardLeader() ? (
+          hasExecutiveDashboardIdentity() && (
+            (isResourceCompany() && resource.data.get('employeeId', '') == getUserEmployeeId()) ||
+            canReadExecutiveDashboardRecord(resource.data)
+          )
+        ) : (
+          isResourceCompany() && (
+            isOwnData(resource.data) ||
+            isHR() ||
+            isPayrollAdmin() ||
+            isOwnRecord(resource.data.employeeId)
+          )
+        ))
+      );
+
+      allow create: if isAuthenticated() && isRequestCompany() && (
+        isSuperAdmin() || isHR() || (
+          isOwnRecord(request.resource.data.employeeId) &&
+          request.resource.data.authUid == request.auth.uid &&
+          request.resource.data.companyId == getUserCompanyId()
+        )
+      ) && validAttendanceCreate();
+
+      allow update: if isAuthenticated() && isRequestCompany() && isResourceCompany() && (
+        (
+          (
+            isSuperAdmin() || isHR() || isPayrollAdmin() || (
+              isOwnRecord(resource.data.employeeId) &&
+              request.resource.data.authUid == request.auth.uid &&
+              request.resource.data.companyId == getUserCompanyId() &&
+              request.resource.data.employeeId == resource.data.employeeId &&
+              request.resource.data.authUid == resource.data.authUid &&
+              request.resource.data.companyId == resource.data.companyId &&
+              request.resource.data.date == resource.data.date
+            )
+          ) && (
+            request.resource.data.status == resource.data.status ||
+            validAttendanceWorkflowTransition()
+          )
+        ) ||
+        validLegacyIdleAttendanceAdoption()
+      );
+
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+    match /attendance_daily_summaries/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() ||
+        (isExecutiveDashboardLeader() ? (
+          hasExecutiveDashboardIdentity() && (
+            (isResourceCompany() && resource.data.get('employeeId', '') == getUserEmployeeId()) ||
+            canReadExecutiveDashboardRecord(resource.data)
+          )
+        ) : (
+          isResourceCompany() && (
+            isOwnData(resource.data) ||
+            isHR() ||
+            isPayrollAdmin() ||
+            isOwnRecord(resource.data.employeeId)
+          )
+        ))
+      );
+      allow create: if isAuthenticated() && isRequestCompany() && (
+        isSuperAdmin() || isHR() || isPayrollAdmin() || (
+          isOwnRecord(request.resource.data.employeeId) &&
+          request.resource.data.authUid == request.auth.uid &&
+          request.resource.data.companyId == getUserCompanyId() &&
+          docId.matches('.*' + request.resource.data.employeeId + '.*') &&
+          request.resource.data.keys().hasOnly(['id', 'employeeId', 'employeeName', 'employeeDepartment', 'avatar', 'companyId', 'date', 'status', 'attendanceStatus', 'attendanceId', 'scheduleId', 'scheduleName', 'isFlexibleSchedule', 'checkIn', 'lunchStart', 'lunchEnd', 'checkOut', 'workedMinutes', 'breakMinutes', 'totalBreakMinutes', 'lateMinutes', 'earlyExitMinutes', 'overtimeMinutes', 'expectedMinutes', 'authUid', 'updatedAt', 'updatedAtIso', 'source', 'lastAction', 'reminders.CHECK_IN_REMINDER', 'reminders.CHECK_IN_TOLERANCE', 'reminders.LUNCH_START_REMINDER', 'reminders.LUNCH_END_REMINDER', 'reminders.CHECK_OUT_REMINDER', 'createdAt'])
+        )
+      );
+      allow update: if isAuthenticated() && isRequestCompany() && isResourceCompany() && (
+        isSuperAdmin() || isHR() || isPayrollAdmin() || (
+          isOwnRecord(resource.data.employeeId) &&
+          request.resource.data.authUid == request.auth.uid &&
+          request.resource.data.companyId == getUserCompanyId() &&
+          request.resource.data.employeeId == resource.data.employeeId &&
+          request.resource.data.authUid == resource.data.authUid &&
+          request.resource.data.companyId == resource.data.companyId &&
+          request.resource.data.date == resource.data.date &&
+          (!('createdAt' in resource.data) || !('createdAt' in request.resource.data) || request.resource.data.createdAt == resource.data.createdAt) &&
+          docId.matches('.*' + resource.data.employeeId + '.*') &&
+          request.resource.data.keys().hasOnly(['id', 'employeeId', 'employeeName', 'employeeDepartment', 'avatar', 'companyId', 'date', 'status', 'attendanceStatus', 'attendanceId', 'scheduleId', 'scheduleName', 'isFlexibleSchedule', 'checkIn', 'lunchStart', 'lunchEnd', 'checkOut', 'workedMinutes', 'breakMinutes', 'totalBreakMinutes', 'lateMinutes', 'earlyExitMinutes', 'overtimeMinutes', 'expectedMinutes', 'authUid', 'updatedAt', 'updatedAtIso', 'source', 'lastAction', 'reminders.CHECK_IN_REMINDER', 'reminders.CHECK_IN_TOLERANCE', 'reminders.LUNCH_START_REMINDER', 'reminders.LUNCH_END_REMINDER', 'reminders.CHECK_OUT_REMINDER', 'createdAt'])
+        )
+      );
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /profile_change_requests/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        (isResourceCompany() && (isHR() || isOwnRecord(resource.data.employeeId)))
+      );
+      allow create: if isAuthenticated() && isRequestCompany() && isOwnRecord(request.resource.data.employeeId);
+      allow update: if isAuthenticated() && isRequestCompany() && isResourceCompany() && (isSuperAdmin() || isHR());
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    function hasTelemetryReadPermission() {
+      let profileId = getUserProfileId();
+      let matrixPath = /databases/$(database)/documents/permissions_matrix/$(profileId);
+
+      return isAuthenticated() &&
+        exists(matrixPath) &&
+        get(matrixPath).data.keys().hasAny(['telemetry']) &&
+        (
+          (
+            get(matrixPath).data.telemetry.keys().hasAny(['Ver']) &&
+            get(matrixPath).data.telemetry.Ver == true
+          ) ||
+          (
+            get(matrixPath).data.telemetry.keys().hasAny(['Editar']) &&
+            get(matrixPath).data.telemetry.Editar == true
+          ) ||
+          (
+            get(matrixPath).data.telemetry.keys().hasAny(['Administrar']) &&
+            get(matrixPath).data.telemetry.Administrar == true
+          )
+        );
+    }
+
+    match /aura_telemetry_events/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (hasTelemetryReadPermission() && isResourceCompany())
+      );
+      allow create: if isAuthenticated() && isRequestCompany();
+      allow update, delete: if false;
+    }
+
+    match /audit_logs/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isResourceCompany());
+      allow create: if isAuthenticated() && isRequestCompany();
+      allow update, delete: if false;
+    }
+
+    match /tasks_export_audit/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isResourceCompany());
+      allow create: if isAuthenticated() && isRequestCompany();
+      allow update, delete: if false;
+    }
+
+    match /payroll_periods/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isResourceCompany());
+      allow create, update: if isAuthenticated() && isRequestCompany() && (isSuperAdmin() || isHR() || isPayrollAdmin());
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /payroll_runs/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isResourceCompany());
+      allow create, update: if isAuthenticated() && isRequestCompany() && (isSuperAdmin() || isHR() || isPayrollAdmin());
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /payroll_employee_snapshots/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        (isResourceCompany() && (
+          isHR() || 
+          isPayrollAdmin() ||
+          isOwnRecord(resource.data.employeeId)
+        ))
+      );
+      allow create, update: if isAuthenticated() && isRequestCompany() && (isSuperAdmin() || isHR() || isPayrollAdmin());
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /payroll_incidents/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        isOwnData(resource.data) ||
+        (isResourceCompany() && (
+          isHR() || 
+          isPayrollAdmin() ||
+          isOwnRecord(resource.data.employeeId)
+        ))
+      );
+      allow create, update: if isAuthenticated() && isRequestCompany() && (isSuperAdmin() || isHR() || isPayrollAdmin());
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /payroll_receipts/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        isOwnData(resource.data) ||
+        (isResourceCompany() && (
+          isHR() || 
+          isPayrollAdmin() ||
+          isOwnRecord(resource.data.employeeId)
+        ))
+      );
+      allow create, update: if isAuthenticated() && isRequestCompany() && (isSuperAdmin() || isHR() || isPayrollAdmin());
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /companies/{companyId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isCompanyUser(companyId));
+      allow create, update: if isAuthenticated() && isSuperAdmin();
+      allow delete: if false;
+
+      match /signatureDocuments/{documentId} {
+        allow read: if isCompanyUser(companyId) && (isHR() || resource.data.employeeId == getUserEmployeeId());
+        allow create, update: if isCompanyUser(companyId) && isHR();
+        allow delete: if isCompanyUser(companyId) && isSuperAdmin();
+      }
+
+      match /signatureConsents/{employeeId} {
+        allow read: if isCompanyUser(companyId) && (isHR() || employeeId == getUserEmployeeId());
+        allow create, update: if isCompanyUser(companyId) && employeeId == getUserEmployeeId()
+          && request.resource.data.employeeId == employeeId
+          && request.resource.data.companyId == companyId;
+        allow delete: if isCompanyUser(companyId) && isSuperAdmin();
+      }
+
+      match /signatureRecords/{recordId} {
+        allow read: if isCompanyUser(companyId) && (isHR() || resource.data.employeeId == getUserEmployeeId());
+        allow write: if false; // Cloud Functions / Backend only
+      }
+
+      match /custody/{docId} {
+        allow read: if isCompanyUser(companyId) && (isHR() || resource.data.employeeId == getUserEmployeeId());
+        allow write: if false; // Cloud Functions / Backend only
+      }
+
+      match /custodyChain/{docId} {
+        allow read: if isCompanyUser(companyId) && (isHR() || resource.data.employeeId == getUserEmployeeId());
+        allow write: if false; // Cloud Functions / Backend only
+      }
+
+      match /auraSignatureEnvelopes/{signatureId} {
+        // F6B: SUPER_ADMIN must name the company path; no collection-group bypass.
+        allow read: if isAuthenticated() && (
+          isSuperAdmin() ||
+          (isCompanyUser(companyId) && (isHR() || resource.data.employeeId == getUserEmployeeId()))
+        );
+        allow create, update: if isCompanyUser(companyId) && isHR();
+        allow delete: if false;
+
+        match /{document=**} {
+          allow create, update: if isCompanyUser(companyId) && isHR();
+          allow delete: if false;
+        }
+
+        // Rules v2 recursive wildcards match zero segments. Require a real
+        // descendant path so this rule cannot bypass the envelope-root policy.
+        match /{subcollection}/{document=**} {
+          allow read: if isCompanyUser(companyId);
+        }
+      }
+
+      match /auraSignatureV2Migrations/{migrationId} {
+        allow read: if isCompanyUser(companyId) && isHR();
+        allow create, update: if isCompanyUser(companyId) && isHR();
+        allow delete: if false;
+      }
+
+      match /signatureEvents/{eventId} {
+        allow read: if isCompanyUser(companyId) && (isHR() || resource.data.employeeId == getUserEmployeeId());
+        allow create, update: if isCompanyUser(companyId) && isHR();
+        allow delete: if false;
+      }
+
+      match /signatureAuditLogs/{logId} {
+        allow read: if isCompanyUser(companyId) && isHR();
+        allow create: if isCompanyUser(companyId);
+        allow update, delete: if false;
+      }
+
+      match /operationalAlertsSummaries/{docId} {
+        allow read: if isCompanyUser(companyId) && (
+          isHR() || 
+          isSuperAdmin() || 
+          getUserRole() == 'DIRECTOR' || 
+          getUserRole() == 'DIRECTOR_GENERAL' || 
+          getUserRole() == 'MANAGER' ||
+          getUserRole() == 'TEAMLEADER' ||
+          getUserRole() == 'TEAM_LEADER' ||
+          getUserRole() == 'JEFE' ||
+          getUserRole() == 'SUPERVISOR' ||
+          getUserProfileId() == 'director' ||
+          getUserProfileId() == 'hr-manager' ||
+          getUserProfileId() == 'manager' ||
+          getUserProfileId() == 'auditor'
+        );
+        allow write: if false;
+      }
+
+      match /{subcollection}/{docId} {
+        allow read: if isCompanyUser(companyId) && !(subcollection in ['signatureConsents', 'signatureRecords', 'custody', 'custodyChain', 'signatureDocuments', 'auraSignatureEnvelopes']);
+        allow create, update: if isCompanyUser(companyId) && !(subcollection in ['signatureConsents', 'signatureRecords', 'custody', 'custodyChain', 'signatureDocuments', 'auraSignatureEnvelopes']);
+        allow delete: if false;
+      }
+    }
+
+    // --- Tablas de Configuraci f³n Globales y Scoped ---
+    match /config/{docId} {
+      allow read: if isAuthenticated() && (resource == null || !resource.data.keys().hasAny(['companyId']) || resource.data.companyId == getUserCompanyId());
+      allow write: if false;
+    }
+
+    match /profiles/{docId} {
+      allow read: if isAuthenticated() && (resource == null || !resource.data.keys().hasAny(['companyId']) || resource.data.companyId == getUserCompanyId());
+      allow write: if false;
+    }
+
+    match /permissions_matrix/{docId} {
+      allow read: if isAuthenticated() && (resource == null || !resource.data.keys().hasAny(['companyId']) || resource.data.companyId == getUserCompanyId());
+      allow write: if false;
+    }
+
+    // --- Tablas de Cat f¡logo Multi-Tenant ---
+    match /departments/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isResourceCompany());
+      allow write: if isAuthenticated() && (isSuperAdmin() || (isRequestCompany() && isHR()));
+    }
+
+    match /positions/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isResourceCompany());
+      allow write: if isAuthenticated() && (isSuperAdmin() || (isRequestCompany() && isHR()));
+    }
+
+    match /locations/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isResourceCompany());
+      allow write: if isAuthenticated() && (isSuperAdmin() || (isRequestCompany() && isHR()));
+    }
+
+    match /areas/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isResourceCompany());
+      allow write: if isAuthenticated() && (isSuperAdmin() || (isRequestCompany() && isHR()));
+    }
+
+    match /benefits/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isResourceCompany());
+      allow write: if isAuthenticated() && (isSuperAdmin() || (isRequestCompany() && isHR()));
+    }
+
+    // --- Tablas de Cat f¡logo Compartidas (Lectura Autenticada Global, Escritura Super Admin) ---
+    match /documentTypes/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /employeePrefixes/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /currencies/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /settings/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || !resource.data.keys().hasAny(['companyId']) || resource.data.companyId == getUserCompanyId());
+      allow write: if isAuthenticated() && isSuperAdmin();
+    }
+
+    // --- Colecciones Adicionales Scoped ---
+
+    match /compensationProfiles/{employeeId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (resource.data.companyId == getUserCompanyId() && (
+          isHR() || isSalesManager() || isPayrollAdmin() ||
+          isOwnEmployee(employeeId, resource.data)
+        ))
+      );
+      allow create, update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (request.resource.data.companyId == getUserCompanyId() && isHR())
+      );
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /commissionPlanDefinitions/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        resource.data.companyId == getUserCompanyId()
+      );
+      allow create, update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (request.resource.data.companyId == getUserCompanyId() && (isHR() || isSalesManager()))
+      );
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /commissionPlans/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        resource.data.companyId == getUserCompanyId()
+      );
+      allow create, update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (request.resource.data.companyId == getUserCompanyId() && (isHR() || isSalesManager()))
+      );
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /commissionableCatalog/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        resource.data.companyId == getUserCompanyId()
+      );
+      allow create, update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (request.resource.data.companyId == getUserCompanyId() && (isHR() || isSalesManager()))
+      );
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /commissionableProducts/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        resource.data.companyId == getUserCompanyId()
+      );
+      allow create, update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (request.resource.data.companyId == getUserCompanyId() && (isHR() || isSalesManager()))
+      );
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /salesTransactions/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (resource.data.companyId == getUserCompanyId() && (
+          isHR() || isSalesManager() || isPayrollAdmin() ||
+          (isSalesEmployee() && resource.data.employeeId == getUserData().employeeId)
+        ))
+      );
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (request.resource.data.companyId == getUserCompanyId() && (
+          isHR() || isSalesManager() ||
+          (isSalesEmployee() && request.resource.data.employeeId == getUserData().employeeId)
+        ))
+      );
+      allow update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (resource.data.companyId == getUserCompanyId() && (
+          isHR() || isSalesManager() ||
+          (isPayrollAdmin() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['totalAmount', 'unitsSold', 'productId', 'employeeId', 'calculatedCommission']))
+        ))
+      );
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /bonusSchemes/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        resource.data.companyId == getUserCompanyId()
+      );
+      allow create, update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (request.resource.data.companyId == getUserCompanyId() && (isHR() || isSalesManager()))
+      );
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /salesKpiDefinitions/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        resource.data.companyId == getUserCompanyId()
+      );
+      allow create, update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (request.resource.data.companyId == getUserCompanyId() && (isHR() || isSalesManager()))
+      );
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /salesKpiTargets/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (resource.data.companyId == getUserCompanyId() && (
+          isHR() || isSalesManager() || isPayrollAdmin() ||
+          (isSalesEmployee() && resource.data.employeeId == getUserData().employeeId)
+        ))
+      );
+      allow create, update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (request.resource.data.companyId == getUserCompanyId() && (isHR() || isSalesManager()))
+      );
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /salesKpiResults/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (resource.data.companyId == getUserCompanyId() && (
+          isHR() || isSalesManager() || isPayrollAdmin() ||
+          (isSalesEmployee() && resource.data.employeeId == getUserData().employeeId)
+        ))
+      );
+      allow create, update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (request.resource.data.companyId == getUserCompanyId() && (isHR() || isSalesManager()))
+      );
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    match /salesPerformanceReviews/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (resource.data.companyId == getUserCompanyId() && (
+          isHR() || isSalesManager() ||
+          (isSalesEmployee() && resource.data.employeeId == getUserData().employeeId)
+        ))
+      );
+      allow create, update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (request.resource.data.companyId == getUserCompanyId() && (isHR() || isSalesManager()))
+      );
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    // --- Executive operational alert sources: company-scoped HR/SUPER_ADMIN read ---
+    match /attendance_alerts/{docId} {
+      allow read: if isAuthenticated() &&
+        (isSuperAdmin() || isHR()) &&
+        resource.data.companyId == getUserCompanyId();
+      allow write: if false;
+    }
+
+    match /document_expiry_alerts_log/{docId} {
+      // Operational metadata only: company + canonical ACTIVE direct-report binding.
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (isResourceCompany() && (
+          isHR() ||
+          (isExecutiveDashboardLeader() &&
+            hasExecutiveDashboardIdentity() &&
+            canReadExecutiveDashboardRecord(resource.data))
+        ))
+      );
+      allow write: if false;
+    }
+
+    // --- Fallback Fail-Closed Total ---
+    match /ai_copilot_drafts/{docId} {
+      allow read, delete: if isAuthenticated() &&
+        resource.data.companyId == getUserCompanyId() &&
+        (
+          resource.data.userId == getUserEmployeeId() ||
+          resource.data.authUid == request.auth.uid
+        );
+
+      allow create: if isAuthenticated() &&
+        request.resource.data.companyId == getUserCompanyId() &&
+        request.resource.data.userId == getUserEmployeeId() &&
+        request.resource.data.authUid == request.auth.uid;
+
+      allow update: if isAuthenticated() &&
+        resource.data.companyId == getUserCompanyId() &&
+        (
+          resource.data.userId == getUserEmployeeId() ||
+          resource.data.authUid == request.auth.uid
+        ) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['companyId', 'tenantId', 'userId', 'authUid']);
+    }
+
+
+    match /executive_incapacity_summaries/{employeeId} {
+
+      // Individual read:
+      // SUPER_ADMIN, HR same-company, or canonical direct-report leader.
+      allow get: if isAuthenticated() &&
+        resource.data.employeeId == employeeId &&
+        (
+          isSuperAdmin() ||
+          (
+            resource.data.companyId == getUserCompanyId() &&
+            (
+              isHR() ||
+              (
+                (
+                  getUserRole() in [
+                    'DIRECTOR',
+                    'DIRECTOR_GENERAL',
+                    'SUBDIRECTOR',
+                    'MANAGER',
+                    'TEAMLEADER',
+                    'TEAM_LEADER',
+                    'SUBLEADER'
+                  ] ||
+                  getUserProfileId() in [
+                    'director',
+                    'director-general',
+                    'subdirector',
+                    'manager',
+                    'teamleader',
+                    'team-leader',
+                    'subleader'
+                  ]
+                ) &&
+                exists(/databases/$(database)/documents/employees/$(employeeId)) &&
+                getEmployeeData(employeeId).companyId == getUserCompanyId() &&
+                getEmployeeData(employeeId).status == 'ACTIVE' &&
+                getEmployeeData(employeeId).reportsTo == getUserEmployeeId()
+              )
+            )
+          )
+        );
+
+      // Company queries are HR-only; leaders never receive list authority.
+      allow list: if isAuthenticated() &&
+        (
+          isSuperAdmin() ||
+          (isHR() && resource.data.companyId == getUserCompanyId())
+        );
+
+      // Projection is server-owned.
+      allow create, update, delete: if false;
+    }
+
+    // BEGIN LOCAL GROWTH CANDIDATE - not configured for deployment
+    function activeGrowthCompany(companyId) {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/growth_identities/$(request.auth.uid))
+        && get(/databases/$(database)/documents/growth_identities/$(request.auth.uid)).data.uid == request.auth.uid
+        && get(/databases/$(database)/documents/growth_identities/$(request.auth.uid)).data.status == "active"
+        && get(/databases/$(database)/documents/growth_identities/$(request.auth.uid)).data.companyId == companyId;
+    }
+
+    match /growth_commercial_contexts/{companyId} {
+      allow read: if activeGrowthCompany(companyId);
+      allow create: if activeGrowthCompany(companyId)
+        && request.resource.data.companyId == companyId;
+      allow update: if activeGrowthCompany(companyId)
+        && resource.data.companyId == companyId
+        && request.resource.data.companyId == companyId;
+      allow delete: if false;
+
+      match /products/{productId} {
+        allow read: if activeGrowthCompany(companyId);
+        allow create: if activeGrowthCompany(companyId)
+          && request.resource.data.companyId == companyId;
+        allow update: if activeGrowthCompany(companyId)
+          && resource.data.companyId == companyId
+          && request.resource.data.companyId == companyId;
+        allow delete: if false;
+      }
+    }
+
+    // END LOCAL GROWTH CANDIDATE
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

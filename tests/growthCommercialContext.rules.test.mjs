@@ -13,7 +13,9 @@ import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, setLogLevel, updat
 // Expected permission denials are asserted below; avoid flooding the test report.
 setLogLevel('silent');
 
-const projectId = 'demo-growth-rules-r1';
+// R8: opt into the complete local candidate, without the compatibility fixture.
+const useCandidate = process.env.AURA_HCM_COMBINED_RULES === '1';
+const projectId = useCandidate ? 'demo-aura-hcm-combined' : 'demo-growth-rules-r1';
 const rules = readFileSync(new URL('../firestore.growth.proposed.rules', import.meta.url), 'utf8');
 const firebaseConfig = JSON.parse(readFileSync(new URL('../firebase.json', import.meta.url), 'utf8'));
 assert.equal(firebaseConfig.firestore, undefined, 'The proposal must not be activated by deploy configuration');
@@ -35,7 +37,9 @@ const hcmFixture = [
 ].join('\n');
 const databaseMatch = 'match /databases/{database}/documents {';
 assert.equal(rules.split(databaseMatch).length, 2, 'Expected a single database match');
-const combinedRules = rules.replace(databaseMatch, databaseMatch + '\n' + hcmFixture);
+const combinedRules = useCandidate
+  ? readFileSync(new URL('../firestore/rules/aura-hcm.growth.candidate.rules', import.meta.url), 'utf8')
+  : rules.replace(databaseMatch, databaseMatch + '\n' + hcmFixture);
 const enterprisePath = company => 'growth_commercial_contexts/' + company;
 const productPath = company => enterprisePath(company) + '/products/id_product%2Fa';
 const context = companyId => ({ id: 'enterprise-domain-id', companyId, tenantId: 'tenant-z', version: 1 });
