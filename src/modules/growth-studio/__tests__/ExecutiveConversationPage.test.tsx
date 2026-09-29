@@ -1,3 +1,4 @@
+import { TEST_RUNTIME, knownBusinessProfile } from './businessProfileFixtures';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GrowthI18nProvider } from '../i18n/GrowthI18nProvider';
@@ -74,7 +75,7 @@ describe('ExecutiveConversationPage', () => {
   it('renders and starts conversation', async () => {
     render(
       <GrowthI18nProvider>
-          <GrowthRuntimeProvider>
+          <GrowthRuntimeProvider runtimeContext={TEST_RUNTIME} businessProfile={knownBusinessProfile()}>
         <ExecutiveConversationPage
           onClose={() => {}}
         />
@@ -90,7 +91,7 @@ describe('ExecutiveConversationPage', () => {
 
     // Wait for the first assistant message
     await waitFor(() => {
-      expect(screen.getByText(/¡Hola! Soy tu asistente de Aura Growth Studio/i)).toBeInTheDocument();
+      expect(screen.getByText(/¡Hola! Soy tu asesor de Aura Growth Studio/i)).toBeInTheDocument();
     });
   });
 
@@ -99,7 +100,7 @@ describe('ExecutiveConversationPage', () => {
     setMockResponseDelay(100);
     render(
       <GrowthI18nProvider>
-          <GrowthRuntimeProvider>
+          <GrowthRuntimeProvider runtimeContext={TEST_RUNTIME} businessProfile={knownBusinessProfile()}>
         <ExecutiveConversationPage
           onClose={() => {}}
         />
@@ -139,7 +140,7 @@ describe('ExecutiveConversationPage', () => {
     setMockResponseDelay(0);
     render(
       <GrowthI18nProvider>
-          <GrowthRuntimeProvider>
+          <GrowthRuntimeProvider runtimeContext={TEST_RUNTIME} businessProfile={knownBusinessProfile()}>
         <ExecutiveConversationPage
           onClose={() => {}}
         />
@@ -164,7 +165,7 @@ describe('ExecutiveConversationPage', () => {
     setMockResponseDelay(0);
     render(
       <GrowthI18nProvider>
-          <GrowthRuntimeProvider>
+          <GrowthRuntimeProvider runtimeContext={TEST_RUNTIME} businessProfile={knownBusinessProfile()}>
         <ExecutiveConversationPage
           onClose={() => {}}
         />
@@ -172,7 +173,7 @@ describe('ExecutiveConversationPage', () => {
         </GrowthI18nProvider>,
     );
 
-    // 1. Iniciar product-first / waiting for product
+    // 1. Reuse explicitly supplied business profile and select scope
     await waitFor(() => {
       expect(screen.getByPlaceholderText('Escribe tu respuesta...')).toBeInTheDocument();
     });
@@ -187,7 +188,7 @@ describe('ExecutiveConversationPage', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/producto, servicio o línea de negocio quieres impulsar/i),
+        screen.getByText(/Tengo estos productos de Aura Nexus/i),
       ).toBeInTheDocument();
       expect(input).not.toBeDisabled();
     });

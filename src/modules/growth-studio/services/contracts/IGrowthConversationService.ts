@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { GrowthConversation, GrowthConversationTurn, GrowthConversationStage } from '../../types/growthConversation';
+import type { BusinessProfile } from '../../types/businessProfile';
 
 /**
  * Parameters to start a new executive growth conversation.
@@ -11,6 +12,9 @@ export interface StartConversationParams {
   readonly tenantId: string;
   readonly companyId: string;
   readonly userId: string;
+  readonly userName?: string;
+  /** Explicit caller-owned knowledge only. No implicit cross-conversation persistence. */
+  readonly businessProfile?: BusinessProfile;
 }
 
 /**

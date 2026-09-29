@@ -1,3 +1,4 @@
+import { knownBusinessProfile } from './businessProfileFixtures';
 import {
   afterEach,
   beforeEach,
@@ -26,7 +27,7 @@ const ID_TOKEN =
   'firebase-id-token-test';
 
 const USER_RESPONSE =
-  'Nuestro principal obstaculo es convertir oportunidades en ventas.';
+  'Quiero vender Aura HCM';
 
 const SERVER_QUESTION =
   '¿Qué parte del proceso comercial pierde más oportunidades?';
@@ -68,6 +69,10 @@ async function seedConversation(
   service: GrowthConversationProductionService,
 ) {
   const conversation = await service.startConversation({
+    tenantId: 'tenant-a',
+    businessProfile: knownBusinessProfile({
+      tenantId: 'tenant-a', companyId: 'aura_root', userId: 'growth-test-user',
+    }),
     userId: 'growth-test-user',
     companyId: 'aura_root',
     companyName: 'Aura Nexus',
@@ -429,7 +434,7 @@ describe(
     );
 
     it(
-      'CASE10 preserves local stage progression before remote content replacement',
+      'CASE10 preserves campaign stage progression after a valid bridge response',
       async () => {
         const service =
           new GrowthConversationProductionService();

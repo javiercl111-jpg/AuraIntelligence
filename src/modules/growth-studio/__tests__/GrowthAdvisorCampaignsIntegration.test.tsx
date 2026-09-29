@@ -1,3 +1,4 @@
+import { TEST_RUNTIME } from './businessProfileFixtures';
 import {
   fireEvent,
   render,
@@ -90,7 +91,7 @@ function SharedRuntimeJourney() {
 
   return (
     <GrowthI18nProvider>
-      <GrowthRuntimeProvider>
+      <GrowthRuntimeProvider runtimeContext={TEST_RUNTIME}>
         {surface === 'advisor' ? (
           <ExecutiveConversationPage
             onClose={() =>
@@ -145,7 +146,7 @@ describe(
 
           expect(
             screen.getByText(
-              /producto, servicio o línea de negocio quieres impulsar/i,
+              /Cuál es tu nombre/i,
             ),
           ).toBeInTheDocument();
         });
@@ -194,8 +195,17 @@ describe(
             });
           };
 
+        await submitAnswer('Javier', /qué función desempeñas/i);
+        await submitAnswer('Director', /cómo se llama tu empresa/i);
+        await submitAnswer('Aura Nexus', /a qué se dedica tu empresa/i);
+        await submitAnswer('Software empresarial', /qué productos o servicios ofrece/i);
+        await submitAnswer('Aura HCM', /confirmas agregar Aura HCM/i);
+        await submitAnswer('Sí', /clientes o mercados principales/i);
+        await submitAnswer('Empresas', /Tengo estos productos de Aura Nexus/i);
+        await submitAnswer('Aura HCM', /qué hace Aura HCM/i);
+        await submitAnswer('Software de recursos humanos', /confirmas actualizar la descripción/i);
         await submitAnswer(
-          'Quiero vender Aura HCM',
+          'Sí',
           /audiencia objetivo a la que nos dirigimos/i,
         );
 
