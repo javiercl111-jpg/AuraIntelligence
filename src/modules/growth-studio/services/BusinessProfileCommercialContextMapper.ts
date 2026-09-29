@@ -20,6 +20,12 @@ export interface CommercialContextSnapshot {
   products: readonly ProductContext[];
 }
 
+/** Read hydration can discover a catalog before an enterprise document exists. */
+export interface CommercialContextReadSnapshot {
+  enterprise: EnterpriseCommercialContext | null;
+  products: readonly ProductContext[];
+}
+
 /** Only selected, confirmed, non-null fields can change canonical knowledge. */
 export interface ConfirmedBusinessProfileChanges {
   company?: {
@@ -35,10 +41,9 @@ export interface ConfirmedBusinessProfileChanges {
 
 function assertScope(expected: Scope, actual: Scope): void {
   if (
-    !expected.tenantId.trim() || !expected.companyId.trim() ||
-    actual.tenantId !== expected.tenantId || actual.companyId !== expected.companyId
+    !expected.companyId.trim() || actual.companyId !== expected.companyId
   ) {
-    throw new Error('Commercial context tenant/company mismatch');
+    throw new Error('Commercial context company mismatch');
   }
 }
 
@@ -54,11 +59,12 @@ function assertProducts(scope: Scope, products: readonly Pick<ProductContext,
   }
 }
 
-function assertInputs(snapshot: CommercialContextSnapshot, session: BusinessProfile): void {
-  assertScope(session, snapshot.enterprise);
+function assertInputs(snapshot: CommercialContextReadSnapshot, session: BusinessProfile): void {
+  if (snapshot.enterprise) assertScope(session, snapshot.enterprise);
+  assertScope(session, session);
   assertProducts(session, snapshot.products);
   assertProducts(session, session.products);
-  if (!snapshot.enterprise.id.trim() || !session.id.trim() || !session.person.userId.trim()) {
+  if ((snapshot.enterprise && !snapshot.enterprise.id.trim()) || !session.id.trim() || !session.person.userId.trim()) {
     throw new Error('Missing enterprise or session identity');
   }
 }
@@ -173,14 +179,16 @@ function newProduct(profile: ProductProfile): ProductContext {
  */
 export class BusinessProfileCommercialContextMapper {
   static fromCommercialContext(
-    snapshot: CommercialContextSnapshot,
+    snapshot: CommercialContextReadSnapshot,
     session: BusinessProfile,
   ): BusinessProfile {
     assertInputs(snapshot, session);
     const view = structuredClone(session);
     const enterprise = snapshot.enterprise;
-    view.companyName = sessionField(enterprise.companyName, session.companyName);
-    view.businessDescription = sessionField(enterprise.businessDescription, session.businessDescription);
+    if (enterprise) {
+      view.companyName = sessionField(enterprise.companyName, session.companyName);
+      view.businessDescription = sessionField(enterprise.businessDescription, session.businessDescription);
+    }
     view.products = snapshot.products.map(product => {
       const previous = session.products.find(item => item.id === product.id);
       const result: ProductProfile = {

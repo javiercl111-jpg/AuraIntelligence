@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { knownBusinessProfile, TEST_RUNTIME } from './businessProfileFixtures';
 import { GrowthConversationMockService, setMockResponseDelay } from '../services/growthConversationMockService';
 import { GrowthConversationProductionService } from '../services/growthConversationProductionService';
+import { GrowthContextBootstrap } from '../services/GrowthContextBootstrap';
+import { BusinessProfileCommercialContextMapper } from '../services/BusinessProfileCommercialContextMapper';
+import type { EnterpriseCommercialContext } from '../types/growthCommercialContext';
 
 const firebaseState = vi.hoisted(() => ({
   currentUser: { getIdToken: vi.fn().mockResolvedValue('test-token') },
@@ -239,18 +242,63 @@ describe.each([
     expect((await service.getBusinessProfile(conv.id))?.products).toHaveLength(5);
   });
 
-  it('rejects cross-tenant/company profiles and products, and never reuses another person', async () => {
+  it('rejects cross-company profiles and products, and never reuses another person', async () => {
     await expect(service.startConversation({
       ...scope, businessProfile: knownBusinessProfile({ ...scope, companyId: 'foreign-company' }),
     })).rejects.toThrow('BUSINESS_PROFILE_SCOPE_MISMATCH');
     const foreignProduct = knownBusinessProfile();
-    foreignProduct.products[0] = { ...foreignProduct.products[0], tenantId: 'foreign-tenant' };
+    foreignProduct.products[0] = { ...foreignProduct.products[0], companyId: 'foreign-company' };
     await expect(service.startConversation({ ...scope, businessProfile: foreignProduct }))
       .rejects.toThrow('BUSINESS_PROFILE_SCOPE_MISMATCH');
     const otherPerson = knownBusinessProfile({ ...scope, userId: 'different-user' });
     const conv = await service.startConversation({ ...scope, businessProfile: otherPerson });
     expect((await service.getConversationTurns(conv.id))[0].content).toContain('¿Cuál es tu nombre?');
     expect((await service.getBusinessProfile(conv.id))?.companyName?.value).toBe('Aura Nexus');
+  });
+
+  it('accepts different tenant metadata for the same company in both service paths', async () => {
+    const profile = knownBusinessProfile({ ...scope, tenantId: 'tenant-z' });
+    profile.products[0] = { ...profile.products[0], tenantId: 'product-tenant' };
+    const conv = await service.startConversation({ ...scope, businessProfile: profile });
+    expect(conv.tenantId).toBe(scope.tenantId);
+    expect(conv.currentStage).toBe('selecting_growth_scope');
+    const result = await answer(service, conv.id, 'Aura HCM');
+    expect(result.state.currentStage).toBe('understanding_audience');
+    expect(result.profile.tenantId).toBe('tenant-z');
+    expect(result.profile.products[0].tenantId).toBe('product-tenant');
+    expect((await service.getConversationTurns(conv.id))[0].content).toContain('Los cambios realizados aquí');
+  });
+
+  it('03B: hydrated company/catalog skip repeat questions and selected product keeps the workflow', async () => {
+    const source = knownBusinessProfile({ ...scope, tenantId: 'tenant-z' });
+    const missing = { value: null, status: 'missing' as const, confidence: 0, evidenceIds: [] };
+    const enterprise: EnterpriseCommercialContext = {
+      id: 'enterprise-a', companyId: scope.companyId, tenantId: 'tenant-z',
+      companyName: source.companyName!, businessDescription: source.businessDescription!,
+      industry: missing, valueProposition: missing, differentiators: missing, targetMarkets: missing,
+      brandTone: missing, communicationStyle: missing, businessGoals: missing,
+      evidence: [{ id: 'explicit-test-fixture', sourceType: 'user', capturedAt: '2026-01-01T00:00:00Z', label: 'Confirmed' }],
+      status: 'active', completenessScore: 20, version: 1,
+      createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+    };
+    const snapshot = BusinessProfileCommercialContextMapper.toCommercialContext(source, { enterprise, products: [] }, {
+      products: source.products.map(product => ({ id: product.id, fields: ['name', 'description'], evidence: enterprise.evidence })),
+    });
+    const session = knownBusinessProfile();
+    session.companyName = undefined;
+    session.businessDescription = undefined;
+    session.products = [];
+    const repo = { readEnterpriseContext: vi.fn().mockResolvedValue(snapshot.enterprise), readProductContexts: vi.fn().mockResolvedValue(snapshot.products) };
+    const hydrated = await GrowthContextBootstrap.hydrate({ runtimeContext: TEST_RUNTIME, businessProfile: session, repository: repo });
+    const conv = await service.startConversation({ ...scope, businessProfile: hydrated.businessProfile });
+    expect(conv.currentStage).toBe('selecting_growth_scope');
+    expect((await service.getConversationTurns(conv.id))[0].content).not.toMatch(/llama tu empresa|dedica tu empresa|Qué productos o servicios ofrece/);
+    const selected = await answer(service, conv.id, 'Aura HCM');
+    expect(selected.state.currentStage).toBe('understanding_audience');
+    expect(selected.state.structuredContext.selectedProductId).toBe('product-0');
+    expect(selected.profile.products[0].tenantId).toBe('tenant-z');
+    expect(repo.readEnterpriseContext).toHaveBeenCalledTimes(1);
+    expect(repo.readProductContexts).toHaveBeenCalledTimes(1);
   });
 
   it('uses a provided runtime name and still asks for the business role', async () => {

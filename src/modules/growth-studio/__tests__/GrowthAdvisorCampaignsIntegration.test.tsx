@@ -29,7 +29,17 @@ import {
   setProductionResponseDelay as setMockResponseDelay,
 } from '../services/growthConversationProductionService';
 
+const commercialContextReads = vi.hoisted(() => ({
+  readEnterpriseContext: vi.fn(),
+  readProductContexts: vi.fn(),
+}));
+
+vi.mock('../services/growthCommercialContextRepository', () => ({
+  createGrowthCommercialContextRepository: () => commercialContextReads,
+}));
+
 vi.mock('../../../firebase', () => ({
+  db: {},
   auth: {
     currentUser: {
       getIdToken: vi.fn().mockResolvedValue(
@@ -119,6 +129,8 @@ describe(
   'Growth Advisor to Campaigns shared runtime',
   () => {
     beforeEach(() => {
+      commercialContextReads.readEnterpriseContext.mockReset().mockResolvedValue(null);
+      commercialContextReads.readProductContexts.mockReset().mockResolvedValue([]);
       setMockResponseDelay(0);
       vi.stubEnv('VITE_GROWTH_ADVISOR_BRIDGE_URL', TEST_BRIDGE_URL);
       vi.stubGlobal('fetch', growthAdvisorFetchMock);

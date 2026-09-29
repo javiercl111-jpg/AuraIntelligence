@@ -110,6 +110,28 @@ function frozen<T>(value: T): T {
 }
 
 describe('BusinessProfileCommercialContextMapper round trips', () => {
+  it('hydrates company scope with distinct tenant metadata without rewriting canonical tenants', () => {
+    const source = {
+      enterprise: { ...enterprise(), tenantId: 'enterprise-tenant' },
+      products: [{ ...product(), tenantId: 'product-tenant' }],
+    };
+    const previous = { ...session(), tenantId: 'session-tenant' };
+    const view = Mapper.fromCommercialContext(frozen(source), previous);
+    expect(view.tenantId).toBe('session-tenant');
+    expect(view.products[0].tenantId).toBe('product-tenant');
+    expect(Mapper.toCommercialContext(view, source, {})).toEqual(source);
+  });
+
+  it('hydrates products without inventing an enterprise or catalog review', () => {
+    const view = Mapper.fromCommercialContext({ enterprise: null, products: [product()] }, session());
+    expect(view.companyName).toBeUndefined();
+    expect(view.businessDescription).toBeUndefined();
+    expect(view.customersOrMarkets).toBeUndefined();
+    expect(view.catalogReviewed).toBeUndefined();
+    expect(view.products[0].name.value).toBe('Aura HCM');
+    expect(view.products[0].name).not.toHaveProperty('freshness');
+  });
+
   it('CASE 1: preserves company, product, knowledge and scope in the session view', () => {
     const source = snapshot();
     const view = Mapper.fromCommercialContext(source, session());
@@ -297,17 +319,17 @@ describe('BusinessProfileCommercialContextMapper round trips', () => {
     expect(result).toEqual(source);
   });
 
-  it.each(['tenantId', 'companyId'] as const)('CASE 11: rejects session %s mismatch in both directions', key => {
+  it.each(['companyId'] as const)('CASE 11: rejects session %s mismatch in both directions', key => {
     const source = snapshot();
     const view = { ...session(), [key]: 'different-scope' };
-    expect(() => Mapper.fromCommercialContext(source, view)).toThrow(/tenant\/company mismatch/);
-    expect(() => Mapper.toCommercialContext(view, source, {})).toThrow(/tenant\/company mismatch/);
+    expect(() => Mapper.fromCommercialContext(source, view)).toThrow(/company mismatch/);
+    expect(() => Mapper.toCommercialContext(view, source, {})).toThrow(/company mismatch/);
   });
 
-  it.each(['tenantId', 'companyId'] as const)('CASE 12: rejects canonical product %s mismatch even when unselected', key => {
+  it.each(['companyId'] as const)('CASE 12: rejects canonical product %s mismatch even when unselected', key => {
     const source = { enterprise: enterprise(), products: [{ ...product(), [key]: 'different-scope' }] };
-    expect(() => Mapper.fromCommercialContext(source, session())).toThrow(/tenant\/company mismatch/);
-    expect(() => Mapper.toCommercialContext(session(), source, {})).toThrow(/tenant\/company mismatch/);
+    expect(() => Mapper.fromCommercialContext(source, session())).toThrow(/company mismatch/);
+    expect(() => Mapper.toCommercialContext(session(), source, {})).toThrow(/company mismatch/);
   });
 
   it('keeps customersOrMarkets separate from enterprise targetMarkets', () => {
@@ -388,12 +410,12 @@ describe('BusinessProfileCommercialContextMapper round trips', () => {
     })).toThrow(/Evidence id conflicts/);
   });
 
-  it.each(['tenantId', 'companyId'] as const)('rejects session products from another %s', key => {
+  it.each(['companyId'] as const)('rejects session products from another %s', key => {
     const source = snapshot();
     const view = session();
     view.products = [{ ...newSessionProduct(), [key]: 'different-scope' }];
-    expect(() => Mapper.fromCommercialContext(source, view)).toThrow(/tenant\/company mismatch/);
-    expect(() => Mapper.toCommercialContext(view, source, {})).toThrow(/tenant\/company mismatch/);
+    expect(() => Mapper.fromCommercialContext(source, view)).toThrow(/company mismatch/);
+    expect(() => Mapper.toCommercialContext(view, source, {})).toThrow(/company mismatch/);
   });
 
   it('rejects duplicate ids and changes targeting an absent session product', () => {

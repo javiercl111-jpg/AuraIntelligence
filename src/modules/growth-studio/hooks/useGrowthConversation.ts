@@ -2,10 +2,12 @@
 // Aura Growth Studio™ — useGrowthConversation Hook
 // ─────────────────────────────────────────────────────────────
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useLayoutEffect } from 'react';
 import type { BusinessProfile } from '../types/businessProfile';
 import type { AuraRuntimeContext } from '../../../types/auraContext';
 import { GrowthContextBootstrap } from '../services/GrowthContextBootstrap';
+import { db } from '../../../firebase';
+import { createGrowthCommercialContextRepository } from '../services/growthCommercialContextRepository';
 import type { GrowthConversation, GrowthConversationTurn } from '../types/growthConversation';
 import type { GrowthObjective } from '../types/growthObjective';
 import type { BrandBrain } from '../types/brandBrain';
@@ -36,7 +38,43 @@ export const useGrowthConversation = (runtimeContext?: AuraRuntimeContext, busin
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const identityKey = JSON.stringify([runtimeContext?.userId, runtimeContext?.companyId]);
+  const activeIdentity = useRef(identityKey);
+  const loadGeneration = useRef(0);
+  const mounted = useRef(false);
+  const clearSession = useCallback(() => {
+    setConversation(null);
+    setTurns([]);
+    setObjective(null);
+    setBrandBrain(null);
+    setCampaignStrategy(null);
+    setExecution(null);
+    setContentPlan(null);
+    setContentBrief(null);
+    submissionInFlight.current = false;
+  }, []);
+
+  useLayoutEffect(() => {
+    mounted.current = true;
+    activeIdentity.current = identityKey;
+    loadGeneration.current += 1;
+    clearSession();
+    setError(null);
+    setIsTyping(false);
+    setLoading(true);
+    return () => {
+      mounted.current = false;
+      loadGeneration.current += 1;
+    };
+  }, [identityKey, clearSession]);
+
   const start = useCallback(async () => {
+    if (!mounted.current || activeIdentity.current !== identityKey) return;
+    const generation = ++loadGeneration.current;
+    const isCurrent = () => mounted.current && activeIdentity.current === identityKey &&
+      loadGeneration.current === generation;
+    clearSession();
+    setLoading(true);
     setIsTyping(true);
     setError(null);
     try {
@@ -44,35 +82,47 @@ export const useGrowthConversation = (runtimeContext?: AuraRuntimeContext, busin
         throw new Error('Growth Advisor requires authenticated runtime context');
       }
 
-      const bootstrap = GrowthContextBootstrap.resolve({
+      const bootstrap = await GrowthContextBootstrap.hydrate({
         runtimeContext,
-        scope: 'company',
+        businessProfile,
+        repository: createGrowthCommercialContextRepository(db),
       });
+      if (!isCurrent()) return;
 
       const conv = await growthConversationService.startConversation({
         tenantId: bootstrap.runtimeContext.tenantId,
         companyId: bootstrap.runtimeContext.companyId,
         userId: bootstrap.runtimeContext.userId,
         userName: bootstrap.runtimeContext.userName,
-        businessProfile,
+        businessProfile: bootstrap.businessProfile,
       });
-      setConversation(conv);
+      if (!isCurrent()) return;
       const convTurns = await growthConversationService.getConversationTurns(conv.id);
+      if (!isCurrent()) return;
+      setConversation(conv);
       setTurns(convTurns);
     } catch (err: unknown) {
+      if (!isCurrent()) return;
       setError(err instanceof Error ? err.message : 'Error al iniciar la conversación');
     } finally {
-      setIsTyping(false);
-      setLoading(false);
+      if (isCurrent()) {
+        setIsTyping(false);
+        setLoading(false);
+      }
     }
-  }, [runtimeContext, businessProfile]);
+  }, [runtimeContext, businessProfile, identityKey, clearSession]);
 
   const addTurn = useCallback(async (content: string) => {
     if (!conversation) return;
     if (isTyping || submissionInFlight.current) return; // Rule: Block submission if already typing
     if (!content.trim()) return; // Rule: Reject empty submission
+    if (!mounted.current || conversation.userId !== runtimeContext?.userId ||
+      conversation.companyId !== runtimeContext?.companyId) return;
 
     submissionInFlight.current = true;
+    const generation = loadGeneration.current;
+    const isCurrent = () => mounted.current && activeIdentity.current === identityKey &&
+      generation === loadGeneration.current;
     const conversationId = conversation.id;
     setIsTyping(true);
     setError(null);
@@ -83,19 +133,24 @@ export const useGrowthConversation = (runtimeContext?: AuraRuntimeContext, busin
         content,
         role: 'user',
       });
+      if (!isCurrent()) return;
 
       // Update UI with user turn immediately
       let updatedTurns = await growthConversationService.getConversationTurns(conversation.id);
+      if (!isCurrent()) return;
       setTurns(updatedTurns);
 
       // 2. Generate assistant response
       await growthConversationService.generateAssistantResponse(conversation.id);
+      if (!isCurrent()) return;
 
       // Update UI with assistant turn and new conversation state
       updatedTurns = await growthConversationService.getConversationTurns(conversation.id);
+      if (!isCurrent()) return;
       setTurns(updatedTurns);
 
       const updatedConv = await growthConversationService.getConversation(conversation.id);
+      if (!isCurrent()) return;
       if (updatedConv) {
         setConversation(updatedConv);
         // 3. Update Objective if in reflection or proposal phase
@@ -107,6 +162,7 @@ export const useGrowthConversation = (runtimeContext?: AuraRuntimeContext, busin
             updatedConv.structuredContext,
             isConfirmed
           );
+          if (!isCurrent()) return;
           setObjective(obj);
 
           // Build Brand Brain
@@ -129,6 +185,7 @@ export const useGrowthConversation = (runtimeContext?: AuraRuntimeContext, busin
             updatedConv.structuredContext,
             explicitConfirmations
           );
+          if (!isCurrent()) return;
           setBrandBrain(bb);
 
           // Build Campaign Strategy
@@ -139,33 +196,42 @@ export const useGrowthConversation = (runtimeContext?: AuraRuntimeContext, busin
             bb.id,
             updatedConv.id
           );
+          if (!isCurrent()) return;
           setCampaignStrategy(strategy);
 
           // Build Executive Execution Plan
           const loadedExecution = await executiveExecutionPlanMockService.getPlan(conversationId);
+          if (!isCurrent()) return;
           setExecution(loadedExecution);
 
           let loadedContentPlan = await contentPlanMockService.getPlan(conversationId);
+          if (!isCurrent()) return;
           if (!loadedContentPlan && loadedExecution?.status === 'confirmed') {
             loadedContentPlan = await contentPlanMockService.generatePlan(conversationId);
+            if (!isCurrent()) return;
           }
           setContentPlan(loadedContentPlan);
 
           let loadedBrief = await executiveContentBriefMockService.getBrief(conversationId);
+          if (!isCurrent()) return;
           if (!loadedBrief && loadedContentPlan) {
             loadedBrief = await executiveContentBriefMockService.generateBrief(conversationId);
+            if (!isCurrent()) return;
           }
           setContentBrief(loadedBrief);
         }
       }
 
     } catch (err: unknown) {
+      if (!isCurrent()) return;
       setError(err instanceof Error ? err.message : 'Error al enviar el mensaje');
     } finally {
-      submissionInFlight.current = false;
-      setIsTyping(false);
+      if (isCurrent()) {
+        submissionInFlight.current = false;
+        setIsTyping(false);
+      }
     }
-  }, [conversation, isTyping]);
+  }, [conversation, isTyping, runtimeContext?.userId, runtimeContext?.companyId, identityKey]);
 
   return {
     conversation,

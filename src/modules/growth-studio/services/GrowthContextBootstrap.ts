@@ -8,6 +8,10 @@ import type {
 import type { ProductKnowledgeIntake } from '../types/productKnowledgeIntake';
 import { EnterpriseCommercialContextMapper } from './EnterpriseCommercialContextMapper';
 import { ProductContextBuilder } from './ProductContextBuilder';
+import type { BusinessProfile } from '../types/businessProfile';
+import type { IGrowthCommercialContextRepository } from './contracts/IGrowthCommercialContextRepository';
+import { BusinessProfileCommercialContextMapper } from './BusinessProfileCommercialContextMapper';
+import { createBusinessSession } from './businessProfileOnboarding';
 import {
   ProductContextReadiness,
   type ProductContextReadinessResult,
@@ -48,6 +52,37 @@ export interface GrowthContextBootstrapResult {
 }
 
 export class GrowthContextBootstrap {
+  /** Read-only hydration. Repository failures propagate; absence is not an error. */
+  static async hydrate(input: {
+    readonly runtimeContext: AuraRuntimeContext;
+    readonly businessProfile?: BusinessProfile;
+    readonly repository: Pick<IGrowthCommercialContextRepository,
+      'readEnterpriseContext' | 'readProductContexts'>;
+  }): Promise<{
+    runtimeContext: ReturnType<typeof resolveAuraContext>;
+    businessProfile: BusinessProfile;
+  }> {
+    const runtimeContext = resolveAuraContext({ fallbackContext: input.runtimeContext });
+    if (!runtimeContext.userId?.trim() || !runtimeContext.companyId?.trim()) {
+      throw new Error('Growth hydration requires authenticated user and company');
+    }
+    // Detach the caller's session before awaiting I/O; person stays session-only.
+    const session = createBusinessSession({
+      ...runtimeContext, businessProfile: input.businessProfile,
+    }).profile;
+    const scope = { companyId: runtimeContext.companyId };
+    const [enterprise, products] = await Promise.all([
+      input.repository.readEnterpriseContext(scope),
+      input.repository.readProductContexts(scope),
+    ]);
+    return {
+      runtimeContext,
+      businessProfile: BusinessProfileCommercialContextMapper.fromCommercialContext(
+        { enterprise, products }, session,
+      ),
+    };
+  }
+
   static resolve(
     input: GrowthContextBootstrapInput,
   ): GrowthContextBootstrapResult {

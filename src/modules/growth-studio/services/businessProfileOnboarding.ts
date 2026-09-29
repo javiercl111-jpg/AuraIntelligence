@@ -21,7 +21,7 @@ interface Question {
 }
 
 export const SESSION_KNOWLEDGE_NOTICE =
-  'El perfil y el catálogo sólo están disponibles en esta conversación; no se guardan para futuras conversaciones.';
+  'Usaré el contexto disponible. Los cambios realizados aquí sólo se aplican a esta sesión; no se guardan para futuras conversaciones.';
 
 export const knownBusinessField = <T>(value: T): BusinessKnowledgeField<T> => ({
   value, status: 'confirmed', confidence: 100, evidenceIds: [], freshness: 'KNOWN',
@@ -38,9 +38,9 @@ export const copyBusinessProfile = (profile: BusinessProfile): BusinessProfile =
 export function createBusinessSession(params: StartConversationParams): BusinessOnboardingSession {
   const supplied = params.businessProfile;
   if (supplied && (
-    supplied.tenantId !== params.tenantId || supplied.companyId !== params.companyId ||
+    supplied.companyId !== params.companyId ||
     supplied.products.some(product =>
-      product.tenantId !== params.tenantId || product.companyId !== params.companyId)
+      product.companyId !== params.companyId)
   )) throw new Error('BUSINESS_PROFILE_SCOPE_MISMATCH');
 
   const profile = supplied ? copyBusinessProfile(supplied) : {
