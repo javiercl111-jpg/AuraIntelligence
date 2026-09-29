@@ -58,6 +58,17 @@ const growthAdvisorFetchMock = vi.fn(
   },
 );
 
+const TEST_RUNTIME_CONTEXT = {
+  tenantId: 'test-tenant',
+  companyId: 'test-company',
+  userId: 'test-user',
+  userEmail: 'growth-advisor@test.local',
+  userName: 'Growth Advisor Test',
+  system: 'aura_intelligence',
+  language: 'es',
+  source: 'widget',
+  createdAt: '2026-09-29T00:00:00.000Z',
+} as const;
 describe('ExecutiveConversationPage', () => {
   beforeEach(() => {
     setMockResponseDelay(0);
@@ -74,7 +85,7 @@ describe('ExecutiveConversationPage', () => {
   it('renders and starts conversation', async () => {
     render(
       <GrowthI18nProvider>
-          <GrowthRuntimeProvider>
+          <GrowthRuntimeProvider runtimeContext={TEST_RUNTIME_CONTEXT}>
         <ExecutiveConversationPage
           onClose={() => {}}
         />
@@ -99,7 +110,7 @@ describe('ExecutiveConversationPage', () => {
     setMockResponseDelay(100);
     render(
       <GrowthI18nProvider>
-          <GrowthRuntimeProvider>
+          <GrowthRuntimeProvider runtimeContext={TEST_RUNTIME_CONTEXT}>
         <ExecutiveConversationPage
           onClose={() => {}}
         />
@@ -139,7 +150,7 @@ describe('ExecutiveConversationPage', () => {
     setMockResponseDelay(0);
     render(
       <GrowthI18nProvider>
-          <GrowthRuntimeProvider>
+          <GrowthRuntimeProvider runtimeContext={TEST_RUNTIME_CONTEXT}>
         <ExecutiveConversationPage
           onClose={() => {}}
         />
@@ -164,7 +175,7 @@ describe('ExecutiveConversationPage', () => {
     setMockResponseDelay(0);
     render(
       <GrowthI18nProvider>
-          <GrowthRuntimeProvider>
+          <GrowthRuntimeProvider runtimeContext={TEST_RUNTIME_CONTEXT}>
         <ExecutiveConversationPage
           onClose={() => {}}
         />

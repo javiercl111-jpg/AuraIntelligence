@@ -130,13 +130,23 @@ function RuntimeProbe() {
 
 function renderRuntime() {
   return render(
-    <GrowthRuntimeProvider
-    >
+    <GrowthRuntimeProvider runtimeContext={TEST_RUNTIME_CONTEXT}>
       <RuntimeProbe />
     </GrowthRuntimeProvider>,
   );
 }
 
+const TEST_RUNTIME_CONTEXT = {
+  tenantId: 'test-tenant',
+  companyId: 'test-company',
+  userId: 'test-user',
+  userEmail: 'growth-advisor@test.local',
+  userName: 'Growth Advisor Test',
+  system: 'aura_intelligence',
+  language: 'es',
+  source: 'widget',
+  createdAt: '2026-09-29T00:00:00.000Z',
+} as const;
 describe(
   'Growth production hook integration',
   () => {
