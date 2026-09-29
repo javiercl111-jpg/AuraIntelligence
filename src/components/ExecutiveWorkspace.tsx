@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Bot, BookOpen, History, ShieldCheck, Activity, ArrowLeft } from 'lucide-react';
 import { isFeatureEnabled } from '../services/featureFlagService';
 import type { AuraIntelligenceContext } from '../types/auraIntelligence';
+import { buildRuntimeContext } from '../services/auraContextEngine';
 
 import AuraCopilotDraftsPanel from './AuraCopilotDraftsPanel';
 import KnowledgeCenterPage from '../pages/KnowledgeCenterPage';
@@ -16,11 +17,15 @@ interface ExecutiveWorkspaceProps {
 type IntelligenceWorkspaceView = 'home' | 'growth';
 
 const ExecutiveWorkspace: React.FC<ExecutiveWorkspaceProps> = ({ context }) => {
+  const growthRuntimeContext = buildRuntimeContext({
+    ...context,
+    source: 'widget',
+  });
   const isGrowthStudioEnabled = isFeatureEnabled('growth_studio.enabled');
   const [currentView, setCurrentView] = useState<IntelligenceWorkspaceView>('home');
 
   const hour = new Date().getHours();
-  let greeting = 'Buenos días';
+  let greeting = 'Buenos d├¡as';
   if (hour >= 12 && hour < 19) greeting = 'Buenas tardes';
   if (hour >= 19 || hour < 5) greeting = 'Buenas noches';
 
@@ -48,7 +53,7 @@ const ExecutiveWorkspace: React.FC<ExecutiveWorkspaceProps> = ({ context }) => {
             <div className={`rounded-2xl border border-white/10 bg-white/[0.03] p-8 ${isGrowthStudioEnabled ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
               <h3 className="mb-2 text-xl font-bold text-white">Asistencia y Conocimiento</h3>
               <p className="mb-6 text-sm text-white/60 max-w-xl">
-                Consulta información operativa, gestiona borradores de acciones y mantén el control sobre las operaciones del ecosistema.
+                Consulta informaci├│n operativa, gestiona borradores de acciones y mant├®n el control sobre las operaciones del ecosistema.
               </p>
               <div className="flex gap-4">
                 <button className="flex items-center gap-2 rounded-xl bg-cyan-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-cyan-500">
@@ -63,7 +68,7 @@ const ExecutiveWorkspace: React.FC<ExecutiveWorkspaceProps> = ({ context }) => {
                 <Activity className="mx-auto mb-4 text-emerald-400" size={32} />
                 <h3 className="mb-2 font-bold text-white">Crecimiento Ejecutivo</h3>
                 <p className="mb-6 text-sm text-white/60">
-                  Construye una estrategia de crecimiento, conviértela en un plan de ejecución y prepara activos empresariales con revisión y control ejecutivo.
+                  Construye una estrategia de crecimiento, convi├®rtela en un plan de ejecuci├│n y prepara activos empresariales con revisi├│n y control ejecutivo.
                 </p>
                 <button 
                   onClick={() => setCurrentView('growth')}
@@ -122,7 +127,7 @@ const ExecutiveWorkspace: React.FC<ExecutiveWorkspaceProps> = ({ context }) => {
             <ArrowLeft size={16} /> Volver a Aura Intelligence
           </button>
           
-          <GrowthStudioEntry />
+          <GrowthStudioEntry runtimeContext={growthRuntimeContext} />
         </div>
       )}
     </div>
@@ -130,4 +135,3 @@ const ExecutiveWorkspace: React.FC<ExecutiveWorkspaceProps> = ({ context }) => {
 };
 
 export default ExecutiveWorkspace;
-
