@@ -23,6 +23,9 @@ import AuraIntelligenceLogin from './components/AuraIntelligenceLogin';
 import AuraAssistantWidget from './components/AuraAssistantWidget';
 
 import GrowthStudioEntry from './modules/growth-studio/components/GrowthStudioEntry';
+import type { AuraRuntimeContext } from './types/auraContext';
+import { resolveGrowthIdentity } from './modules/growth-studio/product/growthIdentity';
+import { getGrowthIdentity } from './modules/growth-studio/services/growthIdentityRepository';
 import AuraGrowthLogin from './modules/growth-studio/product/AuraGrowthLogin';
 
 import {
@@ -85,6 +88,11 @@ const App: React.FC = () => {
     buildDemoContext(),
   );
 
+  const [
+    growthRuntimeContext,
+    setGrowthRuntimeContext,
+  ] = useState<AuraRuntimeContext | null>(null);
+
   useEffect(() => {
     const unsubscribe =
       onAuthStateChanged(
@@ -93,6 +101,56 @@ const App: React.FC = () => {
           setIsAuthenticated(
             Boolean(firebaseUser),
           );
+
+          setGrowthRuntimeContext(null);
+
+          if (
+            isGrowthSurface &&
+            firebaseUser
+          ) {
+            void getGrowthIdentity(
+              firebaseUser.uid,
+            )
+              .then((identityRecord) => {
+                const identity =
+                  resolveGrowthIdentity({
+                    firebaseIdentity: {
+                      uid: firebaseUser.uid,
+                      email: firebaseUser.email,
+                      displayName:
+                        firebaseUser.displayName,
+                    },
+                    identityRecord,
+                  });
+
+                if (
+                  !identity.resolved ||
+                  !identity.companyId ||
+                  !identity.userId
+                ) {
+                  setGrowthRuntimeContext(null);
+                  return;
+                }
+
+                setGrowthRuntimeContext({
+                  tenantId: identity.companyId,
+                  companyId: identity.companyId,
+                  userId: identity.userId,
+                  userEmail: identity.email,
+                  userName: identity.displayName,
+                  system: 'aura_intelligence',
+                  module: 'growth-studio',
+                  route: window.location.pathname,
+                  language: 'es',
+                  source: 'system',
+                  createdAt:
+                    new Date().toISOString(),
+                });
+              })
+              .catch(() => {
+                setGrowthRuntimeContext(null);
+              });
+          }
 
           if (!isGrowthSurface) {
             setContext(
@@ -199,7 +257,9 @@ const App: React.FC = () => {
           </button>
         </div>
 
-        <GrowthStudioEntry />
+        <GrowthStudioEntry
+          runtimeContext={growthRuntimeContext}
+        />
       </main>
     );
   }
