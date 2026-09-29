@@ -34,7 +34,7 @@ export const talentIntelligenceEvaluationV1 = onRequest(
       readProjectId: () => projectID.value(),
       createTenantRegistry: () => new FirestoreTalentTenantRegistryV1(),
       createReceiptStore: () => new FirestoreTalentReceiptStoreV1(),
-      createExecutionBoundary: () => new FailClosedTalentExecutionBoundaryV1(),
+      createExecutionBoundary: (_input) => new FailClosedTalentExecutionBoundaryV1(),
     });
   },
 );

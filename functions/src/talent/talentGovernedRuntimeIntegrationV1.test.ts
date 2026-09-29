@@ -51,6 +51,7 @@ function harness(options: {
   const events: string[] = [];
   const contexts: TalentReceiptContextV1[] = [];
   const finalizations: TalentReceiptFinalizeInputV1[] = [];
+  const boundaryInputs: unknown[] = [];
   const contextCompiler = new AuraTalentContextCompilerV1({ ...authority, rules: TALENT_CONTEXT_RULES_V1 }, authority);
   const runtime = new GovernedTalentAIRuntimeV1({
     authority,
@@ -93,9 +94,13 @@ function harness(options: {
         },
       };
     },
-    createExecutionBoundary: () => { events.push("boundaryFactory"); return runtime; },
+    createExecutionBoundary: (input) => {
+      events.push("boundaryFactory");
+      boundaryInputs.push(input);
+      return runtime;
+    },
   };
-  return { events, contexts, finalizations, dependencies };
+  return { events, contexts, finalizations, boundaryInputs, dependencies };
 }
 async function invoke(state: ReturnType<typeof harness>, value = request()) {
   const response = new MemoryResponse();
@@ -121,6 +126,23 @@ test("fake-backed execution preserves certified order and exact failure finaliza
   });
   assert.equal(state.finalizations[0].context, state.contexts[0]);
   assert.equal(state.contexts[0].auraTenantId, "fixture-tenant");
+  assert.equal(state.boundaryInputs.length, 1);
+  const boundaryInput = state.boundaryInputs[0] as {
+    readonly environment: string;
+    readonly authenticatedConsumerId: string;
+    readonly auraTenantId: string;
+    readonly canonicalRequest: { readonly hcmCompanyId: string };
+  };
+  assert.equal(boundaryInput.environment, "preview");
+  assert.equal(
+    boundaryInput.authenticatedConsumerId,
+    TALENT_BRIDGE_CONSUMER_ID_V1,
+  );
+  assert.equal(boundaryInput.auraTenantId, "fixture-tenant");
+  assert.equal(
+    boundaryInput.canonicalRequest.hcmCompanyId,
+    "fixture-company",
+  );
 });
 
 test("runtime failure never finalizes and does not retry", async () => {
@@ -176,7 +198,7 @@ test("certified fail-closed implementation remains available and has no provider
   const response = new MemoryResponse();
   await talentEndpointV1(request(), response, {
     ...state.dependencies,
-    createExecutionBoundary: () => new FailClosedTalentExecutionBoundaryV1(),
+    createExecutionBoundary: (_input) => new FailClosedTalentExecutionBoundaryV1(),
   });
   assertError(response, "INTERNAL_FAILURE");
   assert.equal(state.events.includes("provider"), false);

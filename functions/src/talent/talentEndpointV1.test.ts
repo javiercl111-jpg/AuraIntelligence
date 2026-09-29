@@ -238,7 +238,7 @@ function defaultDependencies(
     readProjectId: () => "aura-intel-preview",
     createTenantRegistry: activeRegistry,
     createReceiptStore: () => testReceiptStoreV1(reservedOwnerDecisionV1()),
-    createExecutionBoundary: () => testExecutionBoundaryV1(),
+    createExecutionBoundary: (_input) => testExecutionBoundaryV1(),
     ...overrides,
   };
 }
@@ -291,7 +291,7 @@ test("non-POST is method-first and touches no headers, secrets, project, or body
     readProjectId: () => { dependencyCalls += 1; throw new Error(); },
     createTenantRegistry: () => { dependencyCalls += 1; throw new Error(); },
     createReceiptStore: () => { dependencyCalls += 1; throw new Error(); },
-    createExecutionBoundary: () => { dependencyCalls += 1; throw new Error(); },
+    createExecutionBoundary: (_input) => { dependencyCalls += 1; throw new Error(); },
   });
   assertErrorResponse(response, 405, "METHOD_NOT_ALLOWED");
   assert.equal(response.header("Allow"), "POST");
@@ -426,7 +426,7 @@ test("executes the ratified authentication, body, project, and tenant order", as
       };
     },
     createReceiptStore: () => testReceiptStoreV1(reservedOwnerDecisionV1()),
-    createExecutionBoundary: () => testExecutionBoundaryV1(),
+    createExecutionBoundary: (_input) => testExecutionBoundaryV1(),
   });
   assert.deepEqual(events, [
     "bearer", "credential", "principal", "media", "rawBody",
@@ -606,13 +606,17 @@ test("outcome-unknown returns fail-closed 503 without finalization", async () =>
 test("reserved owner binds server-resolved tenant and finalizes exact F1D terminal outcome", async () => {
   const harness = createReceiptHarnessV1();
   const executionHarness = createExecutionHarnessV1();
+  const factoryInputs: TalentExecutionInputV1[] = [];
 
   const response = await invoke(postRequest(), {
     createReceiptStore: () => testReceiptStoreV1(
       reservedOwnerDecisionV1(),
       harness,
     ),
-    createExecutionBoundary: () => testExecutionBoundaryV1(executionHarness),
+    createExecutionBoundary: (input) => {
+      factoryInputs.push(input);
+      return testExecutionBoundaryV1(executionHarness);
+    },
   });
 
   assertErrorResponse(response, 503, "INTERNAL_FAILURE", "validated");
@@ -620,8 +624,10 @@ test("reserved owner binds server-resolved tenant and finalizes exact F1D termin
   assert.equal(harness.finalizeCalls, 1);
   assert.equal(executionHarness.executeCalls, 1);
   assert.equal(executionHarness.inputs.length, 1);
+  assert.equal(factoryInputs.length, 1);
 
   const executionInput = executionHarness.inputs[0];
+  assert.equal(factoryInputs[0], executionInput);
 
   assert.equal(
     executionInput.authenticatedConsumerId,
@@ -692,7 +698,7 @@ test("reserved owner execution failure remains fail-closed without finalization"
       reservedOwnerDecisionV1(),
       receiptHarness,
     ),
-    createExecutionBoundary: () => ({
+    createExecutionBoundary: (_input) => ({
       execute: async () => {
         executionCalls += 1;
         throw new Error("execution-failure");
@@ -764,7 +770,7 @@ test("receipt reserve and finalize failures remain generic internal failures", a
       reservedOwnerDecisionV1(),
       finalizeHarness,
     ),
-    createExecutionBoundary: () => testExecutionBoundaryV1(),
+    createExecutionBoundary: (_input) => testExecutionBoundaryV1(),
   });
 
   assertErrorResponse(
