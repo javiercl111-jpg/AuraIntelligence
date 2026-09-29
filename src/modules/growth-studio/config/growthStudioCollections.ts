@@ -28,7 +28,7 @@ export const GROWTH_COLLECTIONS = {
   /** Audit log of all Growth Studio operations. */
   AUDIT_LOG: 'growth_audit_log',
 
-  /** Commercial contexts, partitioned independently by tenant and company. */
+  /** Commercial contexts, scoped exclusively by canonical company ID. */
   COMMERCIAL_CONTEXTS: 'growth_commercial_contexts',
 } as const;
 
@@ -41,17 +41,26 @@ export type GrowthCollectionName =
 export default GROWTH_COLLECTIONS;
 
 export const GROWTH_COMMERCIAL_SUBCOLLECTIONS = {
-  COMPANIES: 'companies',
   PRODUCTS: 'products',
 } as const;
 
 /**
- * Local Growth design, not a global collection convention:
- * growth_commercial_contexts/{tenant}/companies/{company} is the enterprise doc;
- * its products/{product} subcollection holds stable product documents.
- * Parent tenant documents need not exist. Scope segments are encoded separately,
- * never joined into an ambiguous composite id or inferred from one another.
+ * Canonical company IDs remain unchanged so rules can compare them directly
+ * with the Growth identity's companyId. Invalid segments fail closed.
+ * tenantId is domain metadata and never participates in persistence paths.
  */
+export function growthCompanyIdSegment(id: string): string {
+  if (
+    typeof id !== 'string' || !id.trim() || id.trim() !== id ||
+    id.includes('/') || id === '.' || id === '..' || /^__.*__$/su.test(id) ||
+    /[\uD800-\uDFFF]/u.test(id) || new TextEncoder().encode(id).length > 1500
+  ) {
+    throw new Error('Invalid canonical Growth company identifier');
+  }
+  return id;
+}
+
+/** Reversible, collision-free segment encoding for opaque domain/product IDs. */
 export function growthCommercialIdSegment(id: string): string {
   if (typeof id !== 'string' || !id.trim() || id.trim() !== id) {
     throw new Error('Invalid Growth commercial identifier');
@@ -63,8 +72,7 @@ export function growthCommercialIdSegment(id: string): string {
 
 export function growthEnterpriseContextPath(scope: GrowthCommercialScope): string {
   return [
-    GROWTH_COLLECTIONS.COMMERCIAL_CONTEXTS, growthCommercialIdSegment(scope.tenantId),
-    GROWTH_COMMERCIAL_SUBCOLLECTIONS.COMPANIES, growthCommercialIdSegment(scope.companyId),
+    GROWTH_COLLECTIONS.COMMERCIAL_CONTEXTS, growthCompanyIdSegment(scope.companyId),
   ].join('/');
 }
 

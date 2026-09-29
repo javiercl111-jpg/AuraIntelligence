@@ -1,9 +1,9 @@
-import { afterAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { deleteApp, initializeApp } from 'firebase/app';
 import { getFirestore, Timestamp, type DocumentReference } from 'firebase/firestore';
 
 import {
-  GROWTH_COLLECTIONS, growthCommercialIdSegment, growthEnterpriseContextPath,
+  GROWTH_COLLECTIONS, growthCommercialIdSegment, growthCompanyIdSegment, growthEnterpriseContextPath,
   growthProductContextPath, growthProductContextsPath,
 } from '../config/growthStudioCollections';
 import {
@@ -25,7 +25,8 @@ vi.mock('firebase/firestore', async importOriginal => {
   return { ...actual, getDocFromServer: sdk.get, getDocsFromServer: sdk.list, runTransaction: sdk.transaction };
 });
 
-const scope: GrowthCommercialScope = { tenantId: 'tenant-independent', companyId: 'company-independent' };
+const scope: GrowthCommercialScope = { companyId: 'company-independent' };
+const TENANT_METADATA = 'tenant-independent';
 const INPUT_TIME = '2020-01-01T00:00:00.000Z';
 const CREATE_TIME = '2026-09-01T12:00:00.000Z';
 const UPDATE_TIME = '2026-09-02T12:00:00.000Z';
@@ -43,7 +44,7 @@ function evidence(id = 'evidence-a'): CommercialEvidence {
 
 function metadata() {
   return {
-    ...scope, evidence: [evidence()], status: 'draft' as const, version: 1,
+    ...scope, tenantId: TENANT_METADATA, evidence: [evidence()], status: 'draft' as const, version: 1,
     completenessScore: 63, createdAt: INPUT_TIME, updatedAt: INPUT_TIME,
   };
 }
@@ -157,32 +158,70 @@ function frozen<T>(value: T): T {
 }
 
 describe('Growth commercial paths', () => {
-  it('CASE 1: defines a deterministic singleton enterprise and stable product path', () => {
+  it('CASE 1: defines a deterministic singleton enterprise at the canonical company path', () => {
     expect(growthEnterpriseContextPath(scope)).toBe(
-      'growth_commercial_contexts/id_tenant-independent/companies/id_company-independent',
+      'growth_commercial_contexts/company-independent',
     );
     expect(growthEnterpriseContextPath({ ...scope })).toBe(growthEnterpriseContextPath(scope));
-    expect(growthProductContextPath(scope, 'product-stable')).toBe(
-      growthProductContextsPath(scope) + '/id_product-stable',
-    );
     expect(GROWTH_COLLECTIONS.CONVERSATIONS).toBe('growth_conversations');
   });
 
-  it('CASE 2: another tenant produces another path', () => {
-    expect(growthEnterpriseContextPath({ ...scope, tenantId: 'another' })).not.toBe(growthEnterpriseContextPath(scope));
+  it('CASE 2: places an encoded stable product ID below the canonical company', () => {
+    expect(growthProductContextPath(scope, 'product-stable')).toBe(
+      'growth_commercial_contexts/company-independent/products/id_product-stable',
+    );
+  });
+
+  it('CASE 4/19/20: company is the only scope key and tenant metadata never changes paths', () => {
+    expectTypeOf<GrowthCommercialScope>().toEqualTypeOf<Readonly<{ companyId: string }>>();
+    expectTypeOf<keyof GrowthCommercialScope>().toEqualTypeOf<'companyId'>();
+    expect(scope).not.toHaveProperty('tenantId');
+    for (const tenantId of [TENANT_METADATA, 'another-tenant']) {
+      // Structural callers may carry metadata, but path construction must ignore it.
+      const withMetadata = { ...scope, tenantId };
+      const paths = [
+        growthEnterpriseContextPath(withMetadata),
+        growthProductContextsPath(withMetadata),
+        growthProductContextPath(withMetadata, 'product-stable'),
+      ];
+      expect(paths).toEqual([
+        'growth_commercial_contexts/company-independent',
+        'growth_commercial_contexts/company-independent/products',
+        'growth_commercial_contexts/company-independent/products/id_product-stable',
+      ]);
+      for (const path of paths) {
+        expect(path).not.toContain('/companies/');
+        expect(path).not.toContain(tenantId);
+      }
+    }
   });
 
   it('CASE 3: another company produces another path', () => {
     expect(growthEnterpriseContextPath({ ...scope, companyId: 'another' })).not.toBe(growthEnterpriseContextPath(scope));
-    expect(growthEnterpriseContextPath({ tenantId: scope.companyId, companyId: scope.tenantId }))
-      .not.toBe(growthEnterpriseContextPath(scope));
+    expect(growthProductContextPath({ companyId: 'another' }, 'shared-product'))
+      .not.toBe(growthProductContextPath(scope, 'shared-product'));
+  });
+
+  it.each(['company%2Fcanonical', 'company:canonical', '会社', 'é', 'e\u0301', '😀'])(
+    'preserves canonical company ID %j without encoding or normalization', companyId => {
+      expect(growthCompanyIdSegment(companyId)).toBe(companyId);
+      expect(growthEnterpriseContextPath({ companyId })).toBe('growth_commercial_contexts/' + companyId);
+    },
+  );
+
+  it('keeps distinct Unicode normalization forms as distinct canonical company IDs', () => {
+    expect(growthEnterpriseContextPath({ companyId: 'é' }))
+      .not.toBe(growthEnterpriseContextPath({ companyId: 'e\u0301' }));
   });
 
   it('encodes path separators without collisions and accepts existing product id formats', () => {
     expect(growthCommercialIdSegment('product:tenant:company:a/b')).toBe('id_product%3Atenant%3Acompany%3Aa%2Fb');
     expect(growthCommercialIdSegment('a/b')).not.toBe(growthCommercialIdSegment('a%2Fb'));
     expect(growthCommercialIdSegment('..')).toBe('id_..');
-    expect(growthProductContextPath(scope, 'a/b').split('/')).toHaveLength(6);
+    expect(growthProductContextPath(scope, 'a/b').split('/')).toHaveLength(4);
+    for (const id of ['product:tenant:company:a/b', 'a%2Fb', '..', '製品😀']) {
+      expect(decodeURIComponent(growthCommercialIdSegment(id).slice(3))).toBe(id);
+    }
   });
 
   it.each(['', ' ', ' padded', 'padded ', 'a'.repeat(1500)])('rejects invalid id %j', id => {
@@ -191,11 +230,12 @@ describe('Growth commercial paths', () => {
 });
 
 describe('Growth commercial repository', () => {
-  it('CASE 4: creates enterprise version 1 using server timestamps', async () => {
+  it('creates enterprise version 1 using server timestamps and a domain ID distinct from companyId', async () => {
     const { store, repository } = setup();
     const input = { ...enterprise(), version: 8 };
     await repository.createEnterpriseContext(scope, input);
     expect(store.transactions).toBe(1);
+    expect(input.id).not.toBe(scope.companyId);
     expect(store.documents.get(growthEnterpriseContextPath(scope))).toEqual({
       ...input, version: 1, createdAt: store.now, updatedAt: store.now,
     });
@@ -204,7 +244,7 @@ describe('Growth commercial repository', () => {
     });
   });
 
-  it('CASE 5: creates product version 1 with stable identity and no fabricated fields', async () => {
+  it('creates product version 1 with stable identity and no fabricated fields', async () => {
     const { store, repository } = setup();
     const input = { ...product(), version: 6 };
     await repository.createProductContext(scope, input.id, input);
@@ -217,9 +257,9 @@ describe('Growth commercial repository', () => {
   it('accepts a minimal canonical product from the certified mapper without inventing knowledge', async () => {
     const { repository } = setup();
     const mapped = BusinessProfileCommercialContextMapper.toCommercialContext({
-      id: 'session-view', ...scope, person: { userId: 'session-user' },
+      id: 'session-view', ...scope, tenantId: TENANT_METADATA, person: { userId: 'session-user' },
       products: [{
-        id: 'minimal-product', ...scope, status: 'draft', createdAt: INPUT_TIME, updatedAt: INPUT_TIME,
+        id: 'minimal-product', ...scope, tenantId: TENANT_METADATA, status: 'draft', createdAt: INPUT_TIME, updatedAt: INPUT_TIME,
         name: { value: 'Minimal product', status: 'confirmed', confidence: 100, evidenceIds: [], freshness: 'KNOWN' },
       }],
     }, { enterprise: enterprise(), products: [] }, {
@@ -233,7 +273,7 @@ describe('Growth commercial repository', () => {
     expect(result?.name).not.toHaveProperty('freshness');
   });
 
-  it('CASE 6: create is never an upsert, including a second enterprise id in one scope', async () => {
+  it('create is never an upsert, including a second enterprise id in one scope', async () => {
     const { store, repository } = setup();
     await repository.createEnterpriseContext(scope, enterprise());
     await expect(repository.createEnterpriseContext(scope, { ...enterprise(), id: 'different' }))
@@ -245,7 +285,7 @@ describe('Growth commercial repository', () => {
     expect(store.commits).toBe(2);
   });
 
-  it('CASE 7: correct expectedVersion advances enterprise and product atomically', async () => {
+  it('correct expectedVersion advances enterprise and product atomically', async () => {
     const { store, repository } = setup();
     await repository.createEnterpriseContext(scope, enterprise());
     await repository.createProductContext(scope, product().id, product());
@@ -258,7 +298,7 @@ describe('Growth commercial repository', () => {
     expect(store.commits).toBe(4);
   });
 
-  it('CASE 8: incorrect expectedVersion causes a distinguishable conflict with no write', async () => {
+  it('CASE 12: incorrect expectedVersion causes a distinguishable conflict with no write', async () => {
     const { store, repository } = setup();
     await repository.createEnterpriseContext(scope, enterprise());
     await repository.createProductContext(scope, product().id, product());
@@ -269,21 +309,62 @@ describe('Growth commercial repository', () => {
     expect(store.commits).toBe(2);
   });
 
-  it.each(['tenantId', 'companyId'] as const)('CASE 9/10: %s mismatch fails on input, stored reads and updates', async key => {
+  it('CASE 5/9: company mismatch fails on input, stored reads and updates', async () => {
     const { store, repository } = setup();
-    const wrong = { ...enterprise(), [key]: 'wrong-scope' };
+    const wrong = { ...enterprise(), companyId: 'wrong-scope' };
+    const wrongProduct = { ...product(), companyId: 'wrong-scope' };
     await expect(repository.createEnterpriseContext(scope, wrong))
       .rejects.toMatchObject({ code: 'GROWTH_COMMERCIAL_CONTEXT_SCOPE_MISMATCH' });
-    await expect(repository.createProductContext(scope, product().id, { ...product(), [key]: 'wrong-scope' }))
+    await expect(repository.createProductContext(scope, product().id, wrongProduct))
+      .rejects.toMatchObject({ code: 'GROWTH_COMMERCIAL_CONTEXT_SCOPE_MISMATCH' });
+    await expect(repository.updateEnterpriseContext(scope, wrong, 1))
+      .rejects.toMatchObject({ code: 'GROWTH_COMMERCIAL_CONTEXT_SCOPE_MISMATCH' });
+    await expect(repository.updateProductContext(scope, product().id, wrongProduct, 1))
       .rejects.toMatchObject({ code: 'GROWTH_COMMERCIAL_CONTEXT_SCOPE_MISMATCH' });
     expect(store.transactions).toBe(0);
+    expect(store.reads).toBe(0);
     store.documents.set(growthEnterpriseContextPath(scope), stored(wrong));
-    store.documents.set(growthProductContextPath(scope, product().id), stored({ ...product(), [key]: 'wrong-scope' }));
+    store.documents.set(growthProductContextPath(scope, product().id), stored(wrongProduct));
     await expect(repository.readEnterpriseContext(scope)).rejects.toMatchObject({ code: 'GROWTH_COMMERCIAL_CONTEXT_SCOPE_MISMATCH' });
     await expect(repository.readProductContext(scope, product().id)).rejects.toMatchObject({ code: 'GROWTH_COMMERCIAL_CONTEXT_SCOPE_MISMATCH' });
     await expect(repository.updateEnterpriseContext(scope, enterprise(), 1)).rejects.toMatchObject({ code: 'GROWTH_COMMERCIAL_CONTEXT_SCOPE_MISMATCH' });
     await expect(repository.updateProductContext(scope, product().id, product(), 1)).rejects.toMatchObject({ code: 'GROWTH_COMMERCIAL_CONTEXT_SCOPE_MISMATCH' });
     expect(store.commits).toBe(0);
+  });
+
+  it('CASE 6/7/8/19: preserves independent tenant metadata on create, read and update in one company', async () => {
+    const { store, repository } = setup();
+    const companyScope = { companyId: 'company-a' };
+    const enterpriseInput = { ...enterprise(), ...companyScope, tenantId: 'tenant-z' };
+    const productInput = { ...product(), ...companyScope, tenantId: 'tenant-y' };
+    await repository.createEnterpriseContext(companyScope, enterpriseInput);
+    await repository.createProductContext(companyScope, productInput.id, productInput);
+    expect(await repository.readEnterpriseContext(companyScope)).toMatchObject({ tenantId: 'tenant-z', companyId: 'company-a' });
+    expect(await repository.readProductContext(companyScope, productInput.id)).toMatchObject({ tenantId: 'tenant-y', companyId: 'company-a' });
+    expect([...store.documents.keys()]).toEqual([
+      'growth_commercial_contexts/company-a',
+      'growth_commercial_contexts/company-a/products/id_product-stable',
+    ]);
+    store.now = Timestamp.fromDate(new Date(UPDATE_TIME));
+    await repository.updateEnterpriseContext(companyScope, { ...enterpriseInput, companyName: field('Updated') }, 1);
+    await repository.updateProductContext(companyScope, productInput.id, { ...productInput, name: field('Updated') }, 1);
+    expect(await repository.readEnterpriseContext(companyScope)).toMatchObject({ tenantId: 'tenant-z', companyId: 'company-a', version: 2 });
+    expect(await repository.readProductContext(companyScope, productInput.id)).toMatchObject({ tenantId: 'tenant-y', companyId: 'company-a', version: 2 });
+    expect(store.documents.get(growthEnterpriseContextPath(companyScope))).toMatchObject({ tenantId: 'tenant-z' });
+    expect(store.documents.get(growthProductContextPath(companyScope, productInput.id))).toMatchObject({ tenantId: 'tenant-y' });
+  });
+
+  it.each(['replacement-tenant', scope.companyId])('CASE 10: rejects replacing stored tenant metadata with %s', async tenantId => {
+    const { store, repository } = setup();
+    await repository.createEnterpriseContext(scope, enterprise());
+    await repository.createProductContext(scope, product().id, product());
+    const before = [...store.documents];
+    await expect(repository.updateEnterpriseContext(scope, { ...enterprise(), tenantId }, 1))
+      .rejects.toMatchObject({ code: invalidCode });
+    await expect(repository.updateProductContext(scope, product().id, { ...product(), tenantId }, 1))
+      .rejects.toMatchObject({ code: invalidCode });
+    expect([...store.documents]).toEqual(before);
+    expect(store.commits).toBe(2);
   });
 
   it('CASE 11: product id mismatch fails on writes, reads, updates and catalog reads', async () => {
@@ -302,7 +383,7 @@ describe('Growth commercial repository', () => {
     expect(store.commits).toBe(0);
   });
 
-  it('CASE 12/13: preserves exact createdAt, controls updatedAt and preserves existing completeness', async () => {
+  it('CASE 13/14: preserves exact createdAt, controls updatedAt and preserves existing completeness', async () => {
     const { store, repository } = setup();
     const precision = new Timestamp(1788264000, 123456789);
     store.documents.set(growthEnterpriseContextPath(scope), {
@@ -319,7 +400,7 @@ describe('Growth commercial repository', () => {
     });
   });
 
-  it('CASE 14: omitted evidence survives updates and new evidence is appended', async () => {
+  it('CASE 15: omitted evidence survives updates and new evidence is appended', async () => {
     const { repository } = setup();
     await repository.createProductContext(scope, product().id, product());
     const input = {
@@ -365,7 +446,10 @@ describe('Growth commercial repository', () => {
     ['pending timestamp', { updatedAt: null }],
     ['reversed timestamps', { updatedAt: Timestamp.fromDate(new Date(INPUT_TIME)) }],
     ['empty identity', { id: '' }],
-  ])('CASE 16: rejects malformed Firestore data: %s', async (_label, overrides) => {
+    ['missing tenant metadata', { tenantId: undefined }],
+    ['empty tenant metadata', { tenantId: '' }],
+    ['invalid company segment', { companyId: 'company/other' }],
+  ])('rejects malformed Firestore data: %s', async (_label, overrides) => {
     const { store, repository } = setup();
     store.documents.set(growthEnterpriseContextPath(scope), { ...stored(enterprise()), ...overrides });
     await expect(repository.readEnterpriseContext(scope)).rejects.toMatchObject({ code: invalidCode });
@@ -373,22 +457,23 @@ describe('Growth commercial repository', () => {
     expect(store.commits).toBe(0);
   });
 
-  it('CASE 17: catalog reads only the exact scope, in deterministic id order', async () => {
+  it('CASE 16: catalog reads only the exact company, including different tenant metadata, in deterministic id order', async () => {
     const { store, repository } = setup();
-    const anotherTenant = { ...scope, tenantId: 'other-tenant' };
-    const anotherCompany = { ...scope, companyId: 'other-company' };
+    const anotherCompany = { companyId: scope.companyId + '-other' };
     await repository.createProductContext(scope, 'z', product('z'));
     await repository.createProductContext(scope, 'a', product('a'));
-    await repository.createProductContext(anotherTenant, 'hidden-tenant', { ...product('hidden-tenant'), ...anotherTenant });
-    await repository.createProductContext(anotherCompany, 'hidden-company', { ...product('hidden-company'), ...anotherCompany });
-    expect((await repository.readProductContexts(scope)).map(item => item.id)).toEqual(['a', 'z']);
+    await repository.createProductContext(scope, 'b', { ...product('b'), tenantId: 'other-tenant' });
+    await repository.createProductContext(anotherCompany, 'a', { ...product('a'), ...anotherCompany });
+    const catalog = await repository.readProductContexts(scope);
+    expect(catalog.map(item => item.id)).toEqual(['a', 'b', 'z']);
+    expect(catalog[1].tenantId).toBe('other-tenant');
     expect(store.lists).toEqual([growthProductContextsPath(scope)]);
     // A poisoned document within the requested collection rejects the whole result.
-    store.documents.set(growthProductContextPath(scope, 'poisoned'), stored({ ...product('poisoned'), ...anotherTenant }));
+    store.documents.set(growthProductContextPath(scope, 'poisoned'), stored({ ...product('poisoned'), ...anotherCompany }));
     await expect(repository.readProductContexts(scope)).rejects.toMatchObject({ code: 'GROWTH_COMMERCIAL_CONTEXT_SCOPE_MISMATCH' });
   });
 
-  it('CASE 18: does not mutate inputs and snapshots them before asynchronous work/retries', async () => {
+  it('does not mutate inputs and snapshots them before asynchronous work/retries', async () => {
     const { repository } = setup();
     const immutable = frozen(enterprise());
     await repository.createEnterpriseContext(frozen({ ...scope }), immutable);
@@ -484,15 +569,80 @@ describe('Growth commercial repository', () => {
     await expect(repository.readProductContexts(scope)).rejects.toBe(denied);
   });
 
-  it.each(['tenantId', 'companyId'] as const)('rejects empty %s before storage access', async key => {
+  it.each([
+    ['empty', ''], ['blank', ' '], ['leading whitespace', ' padded'], ['trailing whitespace', 'padded '],
+    ['path separator', 'company/other'], ['dot', '.'], ['dot-dot', '..'],
+    ['reserved', '__company__'], ['reserved with newline', '__company\nother__'],
+    ['unpaired high surrogate', '\uD800'], ['unpaired low surrogate', '\uDC00'],
+    ['too many ASCII bytes', 'a'.repeat(1501)], ['too many UTF-8 bytes', 'é'.repeat(751)],
+    ['too many four-byte code points', '😀'.repeat(376)],
+    ['missing', undefined], ['null', null], ['nonstring', 42],
+  ])('CASE 17: rejects invalid company ID (%s) before any storage I/O', async (_label, companyId) => {
     const { store, repository } = setup();
-    const emptyScope = { ...scope, [key]: '' };
-    await expect(repository.readEnterpriseContext(emptyScope)).rejects.toMatchObject({ code: invalidCode });
-    await expect(repository.readProductContexts(emptyScope)).rejects.toMatchObject({ code: invalidCode });
-    await expect(repository.createProductContext(emptyScope, product().id, product())).rejects.toMatchObject({ code: invalidCode });
+    const invalidScope = { companyId };
+    expect(() => Reflect.apply(growthEnterpriseContextPath, undefined, [invalidScope])).toThrow();
+    expect(() => Reflect.apply(growthProductContextPath, undefined, [invalidScope, product().id])).toThrow();
+    // Reflect.apply deliberately probes runtime inputs beyond the company-only type.
+    const operations = [
+      () => Reflect.apply(repository.readEnterpriseContext, repository, [invalidScope]),
+      () => Reflect.apply(repository.readProductContexts, repository, [invalidScope]),
+      () => Reflect.apply(repository.readProductContext, repository, [invalidScope, product().id]),
+      () => Reflect.apply(repository.createEnterpriseContext, repository, [invalidScope, enterprise()]),
+      () => Reflect.apply(repository.updateEnterpriseContext, repository, [invalidScope, enterprise(), 1]),
+      () => Reflect.apply(repository.createProductContext, repository, [invalidScope, product().id, product()]),
+      () => Reflect.apply(repository.updateProductContext, repository, [invalidScope, product().id, product(), 1]),
+    ];
+    for (const operation of operations) await expect(operation()).rejects.toMatchObject({ code: invalidCode });
     expect(store.reads).toBe(0);
     expect(store.lists).toHaveLength(0);
     expect(store.transactions).toBe(0);
+    expect(store.documents.size).toBe(0);
+  });
+
+  it.each([
+    ['ASCII', 'a'.repeat(1500)], ['two-byte Unicode', 'é'.repeat(750)], ['four-byte Unicode', '😀'.repeat(375)],
+  ])('accepts a canonical company ID at the 1500-byte limit (%s)', async (_label, companyId) => {
+    const { repository } = setup();
+    const boundaryScope = { companyId };
+    const input = { ...enterprise(), companyId };
+    expect(growthEnterpriseContextPath(boundaryScope)).toBe('growth_commercial_contexts/' + companyId);
+    await repository.createEnterpriseContext(boundaryScope, input);
+    expect(await repository.readEnterpriseContext(boundaryScope)).toMatchObject({ companyId, tenantId: TENANT_METADATA });
+  });
+
+  it.each([
+    ['empty', ''], ['blank', ' '], ['leading whitespace', ' padded'], ['trailing whitespace', 'padded '],
+    ['too long when encoded', 'a'.repeat(1500)], ['unpaired surrogate', '\uD800'],
+    ['missing', undefined], ['null', null], ['nonstring', 42],
+  ])('CASE 18: rejects invalid product ID (%s) before storage I/O', async (_label, productId) => {
+    const { store, repository } = setup();
+    await expect(Reflect.apply(repository.readProductContext, repository, [scope, productId]))
+      .rejects.toMatchObject({ code: invalidCode });
+    await expect(Reflect.apply(repository.createProductContext, repository, [scope, productId, product()]))
+      .rejects.toMatchObject({ code: invalidCode });
+    await expect(Reflect.apply(repository.updateProductContext, repository, [scope, productId, product(), 1]))
+      .rejects.toMatchObject({ code: invalidCode });
+    expect(store.reads).toBe(0);
+    expect(store.lists).toHaveLength(0);
+    expect(store.transactions).toBe(0);
+  });
+
+  it.each(['', ' ', ' padded', 'padded '])('still rejects invalid tenant metadata %j without using it as a scope', async tenantId => {
+    const { store, repository } = setup();
+    await expect(repository.createEnterpriseContext(scope, { ...enterprise(), tenantId }))
+      .rejects.toMatchObject({ code: invalidCode });
+    await expect(repository.createProductContext(scope, product().id, { ...product(), tenantId }))
+      .rejects.toMatchObject({ code: invalidCode });
+    await expect(repository.updateEnterpriseContext(scope, { ...enterprise(), tenantId }, 1))
+      .rejects.toMatchObject({ code: invalidCode });
+    await expect(repository.updateProductContext(scope, product().id, { ...product(), tenantId }, 1))
+      .rejects.toMatchObject({ code: invalidCode });
+    expect(store.reads).toBe(0);
+    expect(store.transactions).toBe(0);
+    store.documents.set(growthProductContextPath(scope, product().id), stored({ ...product(), tenantId }));
+    await expect(repository.readProductContext(scope, product().id)).rejects.toMatchObject({ code: invalidCode });
+    await expect(repository.readProductContexts(scope)).rejects.toMatchObject({ code: invalidCode });
+    expect(store.commits).toBe(0);
   });
 
   it('rejects mismatched snapshot paths without returning any foreign document', async () => {

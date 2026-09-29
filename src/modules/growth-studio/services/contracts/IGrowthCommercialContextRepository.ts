@@ -1,6 +1,7 @@
 import type { EnterpriseCommercialContext, ProductContext } from '../../types/growthCommercialContext';
 
-export type GrowthCommercialScope = Readonly<Pick<EnterpriseCommercialContext, 'tenantId' | 'companyId'>>;
+/** Company is the only persistence scope; tenantId remains entity metadata. */
+export type GrowthCommercialScope = Readonly<Pick<EnterpriseCommercialContext, 'companyId'>>;
 
 export type GrowthCommercialContextErrorCode =
   | 'GROWTH_COMMERCIAL_CONTEXT_INVALID_DATA'
@@ -25,6 +26,7 @@ export class GrowthCommercialContextRepositoryError extends Error {
  * Creates are insert-only, with repository version 1 and storage commit timestamps.
  * Updates require both the current entity version and expectedVersion, preserve
  * identity/createdAt/evidence and existing completenessScore, and increment version.
+ * tenantId metadata is retained exactly; attempts to change it on update fail closed.
  * Omitted evidence records are retained; conflicting records are rejected.
  *
  * Write promises acknowledge a commit, not a speculative timestamp. Read explicitly

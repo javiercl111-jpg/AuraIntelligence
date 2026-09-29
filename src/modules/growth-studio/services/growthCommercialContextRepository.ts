@@ -4,7 +4,8 @@ import {
 } from 'firebase/firestore';
 
 import {
-  growthCommercialIdSegment, growthEnterpriseContextPath, growthProductContextPath, growthProductContextsPath,
+  growthCommercialIdSegment, growthCompanyIdSegment, growthEnterpriseContextPath,
+  growthProductContextPath, growthProductContextsPath,
 } from '../config/growthStudioCollections';
 import type {
   CommercialEvidence, CommercialKnowledgeField, EnterpriseCommercialContext, ProductContext,
@@ -66,14 +67,23 @@ function identifier(value: unknown): string {
   return value;
 }
 
+function companyIdentifier(value: unknown): string {
+  if (typeof value !== 'string') return invalid('Invalid company identifier');
+  try {
+    return growthCompanyIdSegment(value);
+  } catch {
+    return invalid('Invalid company identifier');
+  }
+}
+
 function checkedScope(scope: GrowthCommercialScope): GrowthCommercialScope {
   const input = record(scope);
-  return { tenantId: identifier(input.tenantId), companyId: identifier(input.companyId) };
+  return { companyId: companyIdentifier(input.companyId) };
 }
 
 function assertScope(scope: GrowthCommercialScope, actual: GrowthCommercialScope): void {
-  if (scope.tenantId !== actual.tenantId || scope.companyId !== actual.companyId) {
-    throw new GrowthCommercialContextRepositoryError('GROWTH_COMMERCIAL_CONTEXT_SCOPE_MISMATCH', 'Tenant/company mismatch');
+  if (scope.companyId !== actual.companyId) {
+    throw new GrowthCommercialContextRepositoryError('GROWTH_COMMERCIAL_CONTEXT_SCOPE_MISMATCH', 'Company mismatch');
   }
 }
 
@@ -181,7 +191,7 @@ function assertEvidence(fields: CommercialKnowledgeField<unknown>[], evidence: C
 }
 
 function base(input: Record<string, unknown>, scope: GrowthCommercialScope, format: Format) {
-  const identity = { id: identifier(input.id), tenantId: identifier(input.tenantId), companyId: identifier(input.companyId) };
+  const identity = { id: identifier(input.id), tenantId: identifier(input.tenantId), companyId: companyIdentifier(input.companyId) };
   assertScope(scope, identity);
   const createdAt = timestamp(input.createdAt, format);
   const updatedAt = timestamp(input.updatedAt, format);
@@ -329,6 +339,8 @@ export class FirestoreGrowthCommercialContextRepository implements IGrowthCommer
       }
       const current = parse(stored.data, scope, 'storage');
       assertIdentity(current.id, candidate.id);
+      // Immutable metadata, not an authorization or path condition.
+      if (current.tenantId !== candidate.tenantId) invalid('Tenant metadata cannot change during update');
       if (current.version !== expectedVersion || candidate.version !== expectedVersion) {
         throw new GrowthCommercialContextRepositoryError('GROWTH_COMMERCIAL_CONTEXT_VERSION_CONFLICT', 'Expected version does not match current context');
       }
