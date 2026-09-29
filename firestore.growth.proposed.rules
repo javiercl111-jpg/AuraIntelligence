@@ -1,0 +1,47 @@
+// LOCAL PROPOSAL ONLY. Not referenced by firebase.json; do not deploy as a
+// replacement for the production ruleset. Integration requires a separate gate.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function activeGrowthCompany(companyId) {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/growth_identities/$(request.auth.uid))
+        && get(/databases/$(database)/documents/growth_identities/$(request.auth.uid)).data.uid == request.auth.uid
+        && get(/databases/$(database)/documents/growth_identities/$(request.auth.uid)).data.status == "active"
+        && get(/databases/$(database)/documents/growth_identities/$(request.auth.uid)).data.companyId == companyId;
+    }
+
+    // Preserve own-identity lookup; provisioning is never a client operation.
+    match /growth_identities/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list, create, update, delete: if false;
+    }
+
+    match /growth_commercial_contexts/{companyId} {
+      allow read: if activeGrowthCompany(companyId);
+      allow create: if activeGrowthCompany(companyId)
+        && request.resource.data.companyId == companyId;
+      allow update: if activeGrowthCompany(companyId)
+        && resource.data.companyId == companyId
+        && request.resource.data.companyId == companyId;
+      allow delete: if false;
+
+      match /products/{productId} {
+        allow read: if activeGrowthCompany(companyId);
+        allow create: if activeGrowthCompany(companyId)
+          && request.resource.data.companyId == companyId;
+        allow update: if activeGrowthCompany(companyId)
+          && resource.data.companyId == companyId
+          && request.resource.data.companyId == companyId;
+        allow delete: if false;
+      }
+    }
+
+    // tenantId is metadata, never an authorization input.
+    // Domain IDs (including encoded product path segments), evidence, timestamps
+    // and optimistic versioning remain validated by the repository.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
