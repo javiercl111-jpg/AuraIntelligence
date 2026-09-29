@@ -2,13 +2,12 @@
 // Aura Growth Studio™ — Firestore Collection Constants
 // ─────────────────────────────────────────────────────────────
 
+import type { GrowthCommercialScope } from '../services/contracts/IGrowthCommercialContextRepository';
+
 /**
  * Firestore collection names for Growth Studio entities.
  *
- * IMPORTANT: These are constants ONLY. No Firestore services,
- * document writes, or rules modifications are implemented
- * in this sprint. These exist solely to define the data
- * architecture and prevent magic strings in future sprints.
+ * Path authority only; importing this module performs no storage operations.
  */
 export const GROWTH_COLLECTIONS = {
   /** Executive growth conversations. */
@@ -28,6 +27,9 @@ export const GROWTH_COLLECTIONS = {
 
   /** Audit log of all Growth Studio operations. */
   AUDIT_LOG: 'growth_audit_log',
+
+  /** Commercial contexts, partitioned independently by tenant and company. */
+  COMMERCIAL_CONTEXTS: 'growth_commercial_contexts',
 } as const;
 
 /**
@@ -37,3 +39,42 @@ export type GrowthCollectionName =
   (typeof GROWTH_COLLECTIONS)[keyof typeof GROWTH_COLLECTIONS];
 
 export default GROWTH_COLLECTIONS;
+
+export const GROWTH_COMMERCIAL_SUBCOLLECTIONS = {
+  COMPANIES: 'companies',
+  PRODUCTS: 'products',
+} as const;
+
+/**
+ * Local Growth design, not a global collection convention:
+ * growth_commercial_contexts/{tenant}/companies/{company} is the enterprise doc;
+ * its products/{product} subcollection holds stable product documents.
+ * Parent tenant documents need not exist. Scope segments are encoded separately,
+ * never joined into an ambiguous composite id or inferred from one another.
+ */
+export function growthCommercialIdSegment(id: string): string {
+  if (typeof id !== 'string' || !id.trim() || id.trim() !== id) {
+    throw new Error('Invalid Growth commercial identifier');
+  }
+  const encoded = `id_${encodeURIComponent(id)}`;
+  if (encoded.length > 1500) throw new Error('Growth commercial identifier exceeds Firestore limit');
+  return encoded;
+}
+
+export function growthEnterpriseContextPath(scope: GrowthCommercialScope): string {
+  return [
+    GROWTH_COLLECTIONS.COMMERCIAL_CONTEXTS, growthCommercialIdSegment(scope.tenantId),
+    GROWTH_COMMERCIAL_SUBCOLLECTIONS.COMPANIES, growthCommercialIdSegment(scope.companyId),
+  ].join('/');
+}
+
+export function growthProductContextsPath(scope: GrowthCommercialScope): string {
+  return `${growthEnterpriseContextPath(scope)}/${GROWTH_COMMERCIAL_SUBCOLLECTIONS.PRODUCTS}`;
+}
+
+export function growthProductContextPath(
+  scope: GrowthCommercialScope,
+  productId: string,
+): string {
+  return `${growthProductContextsPath(scope)}/${growthCommercialIdSegment(productId)}`;
+}
