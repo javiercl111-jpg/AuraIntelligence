@@ -4,6 +4,8 @@ import {
   useContext,
 } from 'react';
 
+import type { AuraRuntimeContext } from '../../../types/auraContext';
+
 import {
   useGrowthConversation,
 } from '../hooks/useGrowthConversation';
@@ -18,13 +20,19 @@ const GrowthRuntimeContext =
 
 interface GrowthRuntimeProviderProps {
   children: ReactNode;
+  runtimeContext?:
+    | AuraRuntimeContext
+    | null;
 }
 
 export function GrowthRuntimeProvider({
   children,
+  runtimeContext,
 }: GrowthRuntimeProviderProps) {
   const runtime =
-    useGrowthConversation();
+    useGrowthConversation(
+      runtimeContext ?? undefined,
+    );
 
   return (
     <GrowthRuntimeContext.Provider

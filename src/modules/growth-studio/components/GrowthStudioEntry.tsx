@@ -4,6 +4,7 @@ import {
   GrowthI18nProvider,
 } from '../i18n/GrowthI18nProvider';
 
+import type { AuraRuntimeContext } from '../../../types/auraContext';
 import { GrowthRuntimeProvider } from '../runtime/GrowthRuntimeProvider';
 
 import ExecutiveConversationPage from './ExecutiveConversationPage';
@@ -16,7 +17,17 @@ import GrowthProductShell, {
   type GrowthProductSection,
 } from '../product/GrowthProductShell';
 
-export const GrowthStudioEntry: React.FC = () => {
+interface GrowthStudioEntryProps {
+  readonly runtimeContext?:
+    | AuraRuntimeContext
+    | null;
+}
+
+export const GrowthStudioEntry: React.FC<
+  GrowthStudioEntryProps
+> = ({
+  runtimeContext,
+}) => {
   const [activeSection, setActiveSection] =
     useState<GrowthProductSection>('overview');
 
@@ -28,7 +39,9 @@ export const GrowthStudioEntry: React.FC = () => {
 
   return (
     <GrowthI18nProvider>
-      <GrowthRuntimeProvider>
+      <GrowthRuntimeProvider
+        runtimeContext={runtimeContext}
+      >
         <div id="growth-studio-entry">
         <GrowthProductShell
         activeSection={activeSection}
