@@ -2,7 +2,8 @@
 // Aura Growth Studio™ — useGrowthConversation Hook
 // ─────────────────────────────────────────────────────────────
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
+import type { BusinessProfile } from '../types/businessProfile';
 import type { AuraRuntimeContext } from '../../../types/auraContext';
 import { GrowthContextBootstrap } from '../services/GrowthContextBootstrap';
 import type { GrowthConversation, GrowthConversationTurn } from '../types/growthConversation';
@@ -20,29 +21,11 @@ import { contentPlanMockService } from '../services/contentPlanMockService';
 import type { ExecutiveContentBrief } from '../types/executiveContentBrief';
 import { executiveContentBriefMockService } from '../services/executiveContentBriefMockService';
 
-export const useGrowthConversation = (runtimeContext?: AuraRuntimeContext) => {
+export const useGrowthConversation = (runtimeContext?: AuraRuntimeContext, businessProfile?: BusinessProfile) => {
+  const submissionInFlight = useRef(false);
   const [conversation, setConversation] = useState<GrowthConversation | null>(null);
   const [turns, setTurns] = useState<GrowthConversationTurn[]>([]);
 
-  const contextualizeTurns = (
-    conversationTurns: GrowthConversationTurn[],
-  ): GrowthConversationTurn[] => {
-    if (conversationTurns.length === 0) {
-      return conversationTurns;
-    }
-
-    return conversationTurns.map((turn, index) => {
-      if (index !== 0 || turn.role !== 'assistant') {
-        return turn;
-      }
-
-      return {
-        ...turn,
-        content:
-          '¡Hola! Soy tu asistente de Aura Growth Studio™. Para empezar, ¿qué producto, servicio o línea de negocio quieres impulsar?',
-      };
-    });
-  };
   const [objective, setObjective] = useState<GrowthObjective | null>(null);
   const [brandBrain, setBrandBrain] = useState<BrandBrain | null>(null);
   const [campaignStrategy, setCampaignStrategy] = useState<CampaignStrategy | null>(null);
@@ -70,23 +53,26 @@ export const useGrowthConversation = (runtimeContext?: AuraRuntimeContext) => {
         tenantId: bootstrap.runtimeContext.tenantId,
         companyId: bootstrap.runtimeContext.companyId,
         userId: bootstrap.runtimeContext.userId,
+        userName: bootstrap.runtimeContext.userName,
+        businessProfile,
       });
       setConversation(conv);
       const convTurns = await growthConversationService.getConversationTurns(conv.id);
-      setTurns(contextualizeTurns(convTurns));
+      setTurns(convTurns);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al iniciar la conversación');
     } finally {
       setIsTyping(false);
       setLoading(false);
     }
-  }, [runtimeContext]);
+  }, [runtimeContext, businessProfile]);
 
   const addTurn = useCallback(async (content: string) => {
     if (!conversation) return;
-    if (isTyping) return; // Rule: Block submission if already typing
+    if (isTyping || submissionInFlight.current) return; // Rule: Block submission if already typing
     if (!content.trim()) return; // Rule: Reject empty submission
 
+    submissionInFlight.current = true;
     const conversationId = conversation.id;
     setIsTyping(true);
     setError(null);
@@ -100,14 +86,14 @@ export const useGrowthConversation = (runtimeContext?: AuraRuntimeContext) => {
 
       // Update UI with user turn immediately
       let updatedTurns = await growthConversationService.getConversationTurns(conversation.id);
-      setTurns(contextualizeTurns(updatedTurns));
+      setTurns(updatedTurns);
 
       // 2. Generate assistant response
       await growthConversationService.generateAssistantResponse(conversation.id);
 
       // Update UI with assistant turn and new conversation state
       updatedTurns = await growthConversationService.getConversationTurns(conversation.id);
-      setTurns(contextualizeTurns(updatedTurns));
+      setTurns(updatedTurns);
 
       const updatedConv = await growthConversationService.getConversation(conversation.id);
       if (updatedConv) {
@@ -176,6 +162,7 @@ export const useGrowthConversation = (runtimeContext?: AuraRuntimeContext) => {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al enviar el mensaje');
     } finally {
+      submissionInFlight.current = false;
       setIsTyping(false);
     }
   }, [conversation, isTyping]);

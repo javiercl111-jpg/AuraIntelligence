@@ -14,6 +14,12 @@ import type {
   GrowthConversationStage,
 } from '../types/growthConversation';
 import { GrowthObjectiveValidator } from './GrowthObjectiveValidator';
+import type { BusinessProfile } from '../types/businessProfile';
+import {
+  copyBusinessProfile, createBusinessSession, handleBusinessOnboarding,
+  nextBusinessQuestion, SESSION_KNOWLEDGE_NOTICE,
+  type BusinessOnboardingSession,
+} from './businessProfileOnboarding';
 
 /**
  * Global delay for the mock service to simulate AI thinking time.
@@ -27,6 +33,8 @@ export const setProductionResponseDelay = (ms: number) => {
 
 // In-memory storage for the mock service
 const conversations = new Map<string, GrowthConversation>();
+// Session drafts only; deliberately no tenant/global knowledge cache or persistence adapter.
+const businessSessions = new Map<string, BusinessOnboardingSession>();
 const conversationTurns = new Map<string, GrowthConversationTurn[]>();
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -107,6 +115,7 @@ function safeContextStringV1(
 async function requestGrowthAdvisorQuestionV1(
   conversation: unknown,
   turnsInput: unknown,
+  businessProfile?: BusinessProfile,
 ): Promise<string> {
   const endpoint = configuredGrowthAdvisorBridgeUrlV1();
   const token = await getGrowthAdvisorIdTokenV1();
@@ -148,9 +157,10 @@ async function requestGrowthAdvisorQuestionV1(
     .map((turn) => turn.content as string);
 
   const companyName =
-    safeContextStringV1(conversation, 'companyName') ??
+    businessProfile?.companyName?.value?.trim() ||
+    (safeContextStringV1(conversation, 'companyName') ??
     safeContextStringV1(conversation, 'company') ??
-    'la organizacion';
+    'la organizacion');
 
   const industry =
     safeContextStringV1(conversation, 'industry') ??
@@ -217,15 +227,16 @@ async function requestGrowthAdvisorQuestionV1(
   return typedPayload.conversationProposal.nextQuestion.trim();
 }
 export class GrowthConversationProductionService implements IGrowthConversationService {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async startConversation(_params: StartConversationParams): Promise<GrowthConversation> {
+  async startConversation(params: StartConversationParams): Promise<GrowthConversation> {
     if (PRODUCTION_RESPONSE_DELAY_MS > 0) await delay(PRODUCTION_RESPONSE_DELAY_MS);
 
+    const businessSession = createBusinessSession(params);
+    const firstQuestion = nextBusinessQuestion(businessSession);
     const conversation: GrowthConversation = {
       id: `conv_${generateId()}`,
-      tenantId: 'growth_demo_tenant', // Enforced by requirements
-      companyId: 'growth_demo_company',
-      userId: 'growth_demo_user',
+      tenantId: params.tenantId,
+      companyId: params.companyId,
+      userId: params.userId,
       objectiveId: null,
       status: 'active',
       currentStage: 'welcome',
@@ -236,20 +247,26 @@ export class GrowthConversationProductionService implements IGrowthConversationS
     };
 
     conversations.set(conversation.id, conversation);
+    businessSessions.set(conversation.id, businessSession);
 
     // Initial welcome turn
     const welcomeTurn = createTurn(
       conversation.id,
       'assistant',
-      '¡Hola! Soy tu asistente de Aura Growth Studio™. Para empezar, ¿qué producto, servicio o línea de negocio quieres impulsar?',
+      `¡Hola! Soy tu asesor de Aura Growth Studio™. ${firstQuestion.content}\n\n${SESSION_KNOWLEDGE_NOTICE}`,
       1
     );
     conversationTurns.set(conversation.id, [welcomeTurn]);
 
-    // Advance stage automatically to waiting for objective input
-    conversation.currentStage = 'understanding_product';
+    // Ask only the next missing piece of business knowledge.
+    conversation.currentStage = firstQuestion.stage;
 
     return { ...conversation };
+  }
+
+  async getBusinessProfile(conversationId: string): Promise<BusinessProfile | null> {
+    const session = businessSessions.get(conversationId);
+    return session ? copyBusinessProfile(session.profile) : null;
   }
 
   async getConversation(conversationId: string): Promise<GrowthConversation | null> {
@@ -326,8 +343,17 @@ export class GrowthConversationProductionService implements IGrowthConversationS
     let content: string;
     let nextStage = conv.currentStage;
 
-    // State machine logic
-    switch (conv.currentStage) {
+    const businessSession = businessSessions.get(conversationId);
+    // Validate the bridge before accepting knowledge or advancing state.
+    await requestGrowthAdvisorQuestionV1(conv, turns, businessSession?.profile);
+    const businessReply = businessSession
+      ? handleBusinessOnboarding(businessSession, conv, lastUserTurn?.content ?? '')
+      : null;
+
+    if (businessReply) {
+      content = businessReply.content;
+      nextStage = businessReply.stage;
+    } else switch (conv.currentStage) {
       case 'understanding_objective': {
         const userInput = lastUserTurn?.content || '';
         const objectiveVerbMatch =
@@ -513,7 +539,6 @@ export class GrowthConversationProductionService implements IGrowthConversationS
     }
 
     const turnNumber = turns.length + 1;
-    await requestGrowthAdvisorQuestionV1(conv, turns);
 
     const assistantTurn = createTurn(conversationId, 'assistant', content, turnNumber);
     turns.push(assistantTurn);

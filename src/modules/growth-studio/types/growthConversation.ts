@@ -20,6 +20,11 @@ export type GrowthConversationStatus =
  */
 export type GrowthConversationStage =
   | 'welcome'
+  | 'understanding_business_profile'
+  | 'understanding_catalog'
+  | 'selecting_growth_scope'
+  | 'understanding_product_description'
+  | 'confirming_knowledge_update'
   | 'understanding_objective'
   | 'understanding_product'
   | 'understanding_audience'
@@ -42,6 +47,9 @@ export type ConversationRole = 'user' | 'assistant' | 'system';
  * during the conversation stages.
  */
 export interface GrowthStructuredContext {
+  /** Reference to selected reusable knowledge; audience/region below remain campaign-specific. */
+  selectedProductId?: string;
+  growthScope?: 'product' | 'company';
   /** Extracted objective summary. */
   objective?: string;
 
