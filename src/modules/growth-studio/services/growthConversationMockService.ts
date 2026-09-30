@@ -13,6 +13,12 @@ import type {
   GrowthConversationStage,
 } from '../types/growthConversation';
 import { GrowthObjectiveValidator } from './GrowthObjectiveValidator';
+import type { BusinessProfile } from '../types/businessProfile';
+import {
+  copyBusinessProfile, createBusinessSession, handleBusinessOnboarding,
+  nextBusinessQuestion, SESSION_KNOWLEDGE_NOTICE,
+  type BusinessOnboardingSession,
+} from './businessProfileOnboarding';
 
 /**
  * Global delay for the mock service to simulate AI thinking time.
@@ -26,6 +32,8 @@ export const setMockResponseDelay = (ms: number) => {
 
 // In-memory storage for the mock service
 const conversations = new Map<string, GrowthConversation>();
+// Session drafts only; deliberately no tenant/global knowledge cache or persistence adapter.
+const businessSessions = new Map<string, BusinessOnboardingSession>();
 const conversationTurns = new Map<string, GrowthConversationTurn[]>();
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -48,15 +56,16 @@ const createTurn = (
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class GrowthConversationMockService implements IGrowthConversationService {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async startConversation(_params: StartConversationParams): Promise<GrowthConversation> {
+  async startConversation(params: StartConversationParams): Promise<GrowthConversation> {
     if (MOCK_RESPONSE_DELAY_MS > 0) await delay(MOCK_RESPONSE_DELAY_MS);
 
+    const businessSession = createBusinessSession(params);
+    const firstQuestion = nextBusinessQuestion(businessSession);
     const conversation: GrowthConversation = {
       id: `conv_${generateId()}`,
-      tenantId: 'growth_demo_tenant', // Enforced by requirements
-      companyId: 'growth_demo_company',
-      userId: 'growth_demo_user',
+      tenantId: params.tenantId,
+      companyId: params.companyId,
+      userId: params.userId,
       objectiveId: null,
       status: 'active',
       currentStage: 'welcome',
@@ -67,20 +76,26 @@ export class GrowthConversationMockService implements IGrowthConversationService
     };
 
     conversations.set(conversation.id, conversation);
+    businessSessions.set(conversation.id, businessSession);
 
     // Initial welcome turn
     const welcomeTurn = createTurn(
       conversation.id,
       'assistant',
-      '¡Hola! Soy tu asistente de Aura Growth Studio™. Para empezar, ¿qué producto, servicio o línea de negocio quieres impulsar?',
+      `¡Hola! Soy tu asesor de Aura Growth Studio™. ${firstQuestion.content}\n\n${SESSION_KNOWLEDGE_NOTICE}`,
       1
     );
     conversationTurns.set(conversation.id, [welcomeTurn]);
 
-    // Advance stage automatically to waiting for objective input
-    conversation.currentStage = 'understanding_product';
+    // Ask only the next missing piece of business knowledge.
+    conversation.currentStage = firstQuestion.stage;
 
     return { ...conversation };
+  }
+
+  async getBusinessProfile(conversationId: string): Promise<BusinessProfile | null> {
+    const session = businessSessions.get(conversationId);
+    return session ? copyBusinessProfile(session.profile) : null;
   }
 
   async getConversation(conversationId: string): Promise<GrowthConversation | null> {
@@ -157,8 +172,15 @@ export class GrowthConversationMockService implements IGrowthConversationService
     let content: string;
     let nextStage = conv.currentStage;
 
-    // State machine logic
-    switch (conv.currentStage) {
+    const businessSession = businessSessions.get(conversationId);
+    const businessReply = businessSession
+      ? handleBusinessOnboarding(businessSession, conv, lastUserTurn?.content ?? '')
+      : null;
+
+    if (businessReply) {
+      content = businessReply.content;
+      nextStage = businessReply.stage;
+    } else switch (conv.currentStage) {
       case 'understanding_objective': {
         const userInput = lastUserTurn?.content || '';
         const objectiveVerbMatch =

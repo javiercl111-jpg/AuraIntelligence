@@ -4,6 +4,7 @@ import {
   useContext,
 } from 'react';
 
+import type { BusinessProfile } from '../types/businessProfile';
 import type { AuraRuntimeContext } from '../../../types/auraContext';
 
 import {
@@ -20,6 +21,7 @@ const GrowthRuntimeContext =
 
 interface GrowthRuntimeProviderProps {
   children: ReactNode;
+  businessProfile?: BusinessProfile;
   runtimeContext?:
     | AuraRuntimeContext
     | null;
@@ -28,10 +30,12 @@ interface GrowthRuntimeProviderProps {
 export function GrowthRuntimeProvider({
   children,
   runtimeContext,
+  businessProfile,
 }: GrowthRuntimeProviderProps) {
   const runtime =
     useGrowthConversation(
       runtimeContext ?? undefined,
+      businessProfile,
     );
 
   return (
