@@ -1,15 +1,22 @@
+import { knownBusinessProfile } from './businessProfileFixtures';
+import type { StartConversationParams } from '../services/contracts/IGrowthConversationService';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   growthConversationService,
   setMockResponseDelay
 } from '../services/growthConversationMockService';
 
+const startKnownConversation = (params: StartConversationParams) =>
+  growthConversationService.startConversation({
+    ...params, businessProfile: knownBusinessProfile(params),
+  });
+
 describe('GrowthConversationMockService', () => {
   beforeEach(() => {
     setMockResponseDelay(0); // Zero delay for tests
   });
 
-  it('starts a conversation in welcome state', async () => {
+  it('starts contextual onboarding without a profile', async () => {
     const conv = await growthConversationService.startConversation({
       tenantId: 'growth_demo_tenant',
       companyId: 'growth_demo_company',
@@ -17,7 +24,7 @@ describe('GrowthConversationMockService', () => {
     });
 
     expect(conv.status).toBe('active');
-    expect(conv.currentStage).toBe('understanding_product');
+    expect(conv.currentStage).toBe('understanding_business_profile');
     expect(conv.tenantId).toBe('growth_demo_tenant');
 
     const turns = await growthConversationService.getConversationTurns(conv.id);
@@ -26,7 +33,7 @@ describe('GrowthConversationMockService', () => {
   });
 
   it('progresses through the full state machine via happy path', async () => {
-    const conv = await growthConversationService.startConversation({
+    const conv = await startKnownConversation({
       tenantId: 'test', companyId: 'test', userId: 'test'
     });
 
@@ -98,8 +105,8 @@ describe('GrowthConversationMockService', () => {
     expect(updatedConv?.status).toBe('completed');
   });
 
-  it('captures the first answer as product before asking for audience', async () => {
-    const conv = await growthConversationService.startConversation({
+  it('selects a known product before asking for campaign audience', async () => {
+    const conv = await startKnownConversation({
       tenantId: 'test', companyId: 'test', userId: 'test'
     });
 
@@ -114,7 +121,7 @@ describe('GrowthConversationMockService', () => {
     expect(updatedConv?.structuredContext.expectedResult).toBeUndefined();
   });
   it('handles correction flow in executive_reflection', async () => {
-    const conv = await growthConversationService.startConversation({
+    const conv = await startKnownConversation({
       tenantId: 'test', companyId: 'test', userId: 'test'
     });
 
@@ -150,7 +157,7 @@ describe('GrowthConversationMockService', () => {
 
   it('debe permitir corregir un dato del Brand Brain en la fase executive_reflection', async () => {
     // 1. Iniciar conversación
-    const startedConv = await growthConversationService.startConversation({
+    const startedConv = await startKnownConversation({
       tenantId: 'test', companyId: 'test', userId: 'test'
     });
     const convId = startedConv.id;
@@ -197,7 +204,7 @@ describe('GrowthConversationMockService', () => {
 
   it('captures explicit channel recommendation delegation without treating uncertainty as authorization', async () => {
     const delegated =
-      await growthConversationService.startConversation({
+      await startKnownConversation({
         userId: 'user-delegated',
         tenantId: 'tenant-delegated',
         companyId: 'company-delegated',
@@ -268,7 +275,7 @@ describe('GrowthConversationMockService', () => {
     ).toBeUndefined();
 
     const uncertain =
-      await growthConversationService.startConversation({
+      await startKnownConversation({
         userId: 'user-uncertain',
         tenantId: 'tenant-uncertain',
         companyId: 'company-uncertain',
@@ -334,9 +341,9 @@ describe('GrowthConversationMockService', () => {
         .campaignChannels,
     ).toBeUndefined();
   });
-  it("captures the complete first answer as product under the product-first contract", async () => {
+  it("selects the canonical known product from an explicit growth request", async () => {
     const conversation =
-      await growthConversationService.startConversation({
+      await startKnownConversation({
         userId: 'user-objective-parser',
         tenantId: 'tenant-objective-parser',
         companyId: 'company-objective-parser',
@@ -359,7 +366,7 @@ describe('GrowthConversationMockService', () => {
 
     expect(
       state?.structuredContext.productOrService,
-    ).toBe('Quiero comercializar Aura HCM');
+    ).toBe('Aura HCM');
 
     expect(
       state?.structuredContext.objective,
@@ -382,7 +389,7 @@ describe('GrowthConversationMockService', () => {
     ).toBe('understanding_audience');
   });
   it('rejects empty input', async () => {
-    const conv = await growthConversationService.startConversation({
+    const conv = await startKnownConversation({
       tenantId: 'test', companyId: 'test', userId: 'test'
     });
 

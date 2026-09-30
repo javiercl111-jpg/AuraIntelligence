@@ -1,7 +1,10 @@
+import { TEST_RUNTIME, knownBusinessProfile } from './businessProfileFixtures';
 import {
+  act,
   cleanup,
   fireEvent,
   render,
+  renderHook,
   screen,
   waitFor,
 } from '@testing-library/react';
@@ -34,6 +37,7 @@ import {
   GrowthRuntimeProvider,
   useGrowthRuntime,
 } from '../runtime/GrowthRuntimeProvider';
+import { useGrowthConversation } from '../hooks/useGrowthConversation';
 
 const NOW =
   '2026-09-18T00:00:00.000Z';
@@ -65,7 +69,7 @@ const welcomeTurn = {
   id: 'turn-1',
   conversationId: conversation.id,
   role: 'assistant',
-  content: 'Welcome',
+  content: '¿Qué función desempeñas en tu empresa?',
   turnNumber: 1,
   createdAt: NOW,
 };
@@ -130,23 +134,12 @@ function RuntimeProbe() {
 
 function renderRuntime() {
   return render(
-    <GrowthRuntimeProvider runtimeContext={TEST_RUNTIME_CONTEXT}>
+    <GrowthRuntimeProvider runtimeContext={TEST_RUNTIME} businessProfile={knownBusinessProfile()}>
       <RuntimeProbe />
     </GrowthRuntimeProvider>,
   );
 }
 
-const TEST_RUNTIME_CONTEXT = {
-  tenantId: 'test-tenant',
-  companyId: 'test-company',
-  userId: 'test-user',
-  userEmail: 'growth-advisor@test.local',
-  userName: 'Growth Advisor Test',
-  system: 'aura_intelligence',
-  language: 'es',
-  source: 'widget',
-  createdAt: '2026-09-29T00:00:00.000Z',
-} as const;
 describe(
   'Growth production hook integration',
   () => {
@@ -155,7 +148,7 @@ describe(
     });
 
     beforeEach(() => {
-      vi.clearAllMocks();
+      vi.resetAllMocks();
 
       for (
         const key of
@@ -214,6 +207,26 @@ describe(
         });
     });
 
+    it('rejects blank and simultaneous submissions, then releases the lock', async () => {
+      const { result } = renderHook(() => useGrowthConversation(TEST_RUNTIME));
+      await act(async () => { await result.current.start(); });
+      await act(async () => {
+        await result.current.addTurn('   ');
+      });
+      expect(productionService.addTurn).not.toHaveBeenCalled();
+      await act(async () => {
+        await Promise.all([
+          result.current.addTurn('Javier'), result.current.addTurn('Javier'),
+        ]);
+      });
+      expect(productionService.addTurn).toHaveBeenCalledTimes(1);
+      expect(productionService.generateAssistantResponse).toHaveBeenCalledTimes(1);
+      expect(result.current.isTyping).toBe(false);
+      productionService.getConversationTurns.mockResolvedValue([welcomeTurn]);
+      await act(async () => { await result.current.addTurn('Director'); });
+      expect(productionService.addTurn).toHaveBeenCalledTimes(2);
+    });
+
     it(
       'CASE1 routes start through production singleton and preserves shared structuredContext',
       async () => {
@@ -255,7 +268,7 @@ describe(
             'first-turn-content',
           ).textContent,
         ).toContain(
-          'producto, servicio o línea de negocio',
+          '¿Qué función desempeñas en tu empresa?',
         );
 
         expect(
