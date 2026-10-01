@@ -46,4 +46,5 @@ import type {
     profile: AuraHCMProfileContext | null;
     permissions: AuraHCMPermissionsContext;
     company: AuraHCMCompanyContext | null;
+    identityResolved: boolean;
   }

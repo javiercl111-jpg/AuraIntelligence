@@ -181,43 +181,40 @@ import {
     }
   };
   
+  // SECURITY (GSTACK-AURA-AUTH-REMEDIATION-R2): authorization-sensitive
+  // values (role, permissions, profileId, company scope) must come ONLY
+  // from trusted persisted identity records (employee/profile documents
+  // resolved by verified email). Client/UI-supplied context — including
+  // any "fallback*" value — is NEVER consulted here, so it structurally
+  // cannot grant or widen authorization, resolved or not.
   export const buildAuraHCMConnectorContext = async ({
     userEmail,
-    fallbackCompanyId,
-    fallbackRole,
-    fallbackProfileId,
-    fallbackPermissions = [],
   }: {
     userEmail?: string;
-    fallbackCompanyId?: string;
-    fallbackRole?: AuraUserRole;
-    fallbackProfileId?: string;
-    fallbackPermissions?: string[];
   }): Promise<AuraHCMConnectorContext> => {
     const employee = await findEmployeeByEmail(userEmail);
-  
-    const profile = await findProfileById(
-      employee?.profileId || fallbackProfileId
-    );
-  
+
+    // Profile lookup may use only the employee's own persisted profileId.
+    const profile = await findProfileById(employee?.profileId);
+
+    const identityResolved = Boolean(employee);
+
     const permissions = inferPermissionsContext({
-      profileId: employee?.profileId || profile?.profileId || fallbackProfileId,
-      role: employee?.role || profile?.role || fallbackRole,
-      permissions: [
-        ...normalizePermissions(fallbackPermissions),
-        ...normalizePermissions(profile?.permissions),
-      ],
+      profileId: employee?.profileId || profile?.profileId,
+      role: employee?.role || profile?.role,
+      permissions: normalizePermissions(profile?.permissions),
     });
-  
-    const company = await findCompanyById(
-      employee?.companyId || fallbackCompanyId
-    );
-  
+
+    // Company authorization scope comes only from the trusted
+    // employee → company binding.
+    const company = await findCompanyById(employee?.companyId);
+
     return {
       employee,
       profile,
       permissions,
       company,
+      identityResolved,
     };
   };
 
@@ -235,22 +232,49 @@ import {
     ].includes(normalized);
   };
 
+  // SECURITY (GSTACK-AURA-AUTH-REMEDIATION-R2): resolves the scope a
+  // protected read may use. A non-management caller with a missing,
+  // empty, or whitespace-only employeeId is DENIED (null) before any
+  // Firestore query runs — missing employeeId must never be treated as
+  // "omit the employee filter" (which would silently widen the read to
+  // company-wide scope).
+  type ReadScope =
+    | { isMgmt: true }
+    | { isMgmt: false; employeeId: string };
+
+  const resolveReadScope = (
+    role: string | undefined,
+    employeeId: string | undefined
+  ): ReadScope | null => {
+    if (isManagementRole(role)) {
+      return { isMgmt: true };
+    }
+
+    // Validate blankness only; equality must use the exact persisted key.
+    if (typeof employeeId !== 'string' || !employeeId.trim()) {
+      return null;
+    }
+
+    return { isMgmt: false, employeeId };
+  };
+
   export const getPendingVacationRequests = async (
     companyId: string,
     employeeId?: string,
     role?: string
   ): Promise<any[]> => {
     if (!db) return [];
+    const scope = resolveReadScope(role, employeeId);
+    if (!scope) return [];
     try {
-      const isMgmt = isManagementRole(role);
       const qConstraints = [
         where('companyId', '==', companyId),
         where('status', 'in', ['PENDING', 'PENDING_DIRECTOR', 'PENDING_RH']),
         limit(6),
       ];
 
-      if (!isMgmt && employeeId) {
-        qConstraints.push(where('employeeId', '==', employeeId));
+      if (!scope.isMgmt) {
+        qConstraints.push(where('employeeId', '==', scope.employeeId));
       }
 
       const q = query(collection(db, 'vacation_requests'), ...qConstraints);
@@ -271,16 +295,17 @@ import {
     role?: string
   ): Promise<any[]> => {
     if (!db) return [];
+    const scope = resolveReadScope(role, employeeId);
+    if (!scope) return [];
     try {
-      const isMgmt = isManagementRole(role);
       const qConstraints = [
         where('companyId', '==', companyId),
         where('status', 'in', ['PENDING', 'PENDING_RH']),
         limit(6),
       ];
 
-      if (!isMgmt && employeeId) {
-        qConstraints.push(where('employeeId', '==', employeeId));
+      if (!scope.isMgmt) {
+        qConstraints.push(where('employeeId', '==', scope.employeeId));
       }
 
       const q = query(collection(db, 'permission_requests'), ...qConstraints);
@@ -301,16 +326,17 @@ import {
     role?: string
   ): Promise<any[]> => {
     if (!db) return [];
+    const scope = resolveReadScope(role, employeeId);
+    if (!scope) return [];
     try {
-      const isMgmt = isManagementRole(role);
       const qConstraints = [
         where('companyId', '==', companyId),
         where('recordStatus', '==', 'ACTIVE'),
         limit(6),
       ];
 
-      if (!isMgmt && employeeId) {
-        qConstraints.push(where('employeeId', '==', employeeId));
+      if (!scope.isMgmt) {
+        qConstraints.push(where('employeeId', '==', scope.employeeId));
       }
 
       const q = query(collection(db, 'incapacity_requests'), ...qConstraints);
@@ -325,21 +351,23 @@ import {
     }
   };
 
+  // getExpiringDocuments has no management-scope concept (callers never
+  // pass a role) — it is always self-scoped. A missing/empty/whitespace
+  // employeeId must still DENY rather than silently return a company-wide
+  // result.
   export const getExpiringDocuments = async (
     companyId: string,
     employeeId?: string
   ): Promise<any[]> => {
     if (!db) return [];
+    if (typeof employeeId !== 'string' || !employeeId.trim()) return [];
     try {
       const qConstraints = [
         where('companyId', '==', companyId),
         where('isOperationalAlertActive', '==', true),
+        where('employeeId', '==', employeeId),
         limit(6),
       ];
-
-      if (employeeId) {
-        qConstraints.push(where('employeeId', '==', employeeId));
-      }
 
       const q = query(collection(db, 'document_expiry_alerts_log'), ...qConstraints);
       const snapshot = await getDocs(q);
@@ -359,8 +387,9 @@ import {
     role?: string
   ): Promise<any[]> => {
     if (!db) return [];
+    const scope = resolveReadScope(role, employeeId);
+    if (!scope) return [];
     try {
-      const isMgmt = isManagementRole(role);
       const limitVal = 6;
 
       const safeQuery = async (colName: string, path?: string) => {
@@ -374,8 +403,8 @@ import {
             qConstraints.push(where('companyId', '==', companyId));
           }
 
-          if (!isMgmt && employeeId) {
-            qConstraints.push(where('employeeId', '==', employeeId));
+          if (!scope.isMgmt) {
+            qConstraints.push(where('employeeId', '==', scope.employeeId));
           }
 
           const colRef = path ? collection(db, path) : collection(db, colName);

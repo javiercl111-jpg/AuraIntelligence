@@ -15,10 +15,6 @@ import {
 } from './auraUsageEngine';
 
 import { buildAuraHCMConnectorContext } from './auraHCMConnectorService';
-import { buildAuraMaintenanceConnectorContext } from './auraMaintenanceConnectorService';
-import { answerAuraMaintenanceQuestion } from './auraMaintenanceIntelligence';
-import { buildAuraSignatureConnectorContext } from './auraSignatureConnectorService';
-import { answerAuraSignatureQuestion } from './auraSignatureIntelligence';
 import { resolveAuraPreparedAction } from './auraPreparedActionResolver';
 import answerAuraOperationalQuestion from '../modules/operational-intelligence/services/auraOperationalIntelligenceService';
 
@@ -79,35 +75,39 @@ export const askAuraIntelligence = async (
     const suggestedActions = suggestAuraActions(intent);
     const preparedAction = resolveAuraPreparedAction(request.question);
 
+    // SECURITY (GSTACK-AURA-AUTH-REMEDIATION-R2): buildAuraHCMConnectorContext
+    // resolves authorization values exclusively from trusted persisted
+    // employee/profile records — it accepts no client/UI fallback input,
+    // so there is nothing to reconstruct authorization from here.
     const hcmContext = await buildAuraHCMConnectorContext({
       userEmail: request.context.userEmail,
-      fallbackCompanyId: request.context.companyId,
-      fallbackRole: request.context.role,
-      fallbackProfileId: request.context.profileId,
-      fallbackPermissions: request.context.permissions || [],
     });
+
+    // R3: validate blankness without rewriting persisted authorization keys.
+    const employeeId = hcmContext.employee?.employeeId;
+    const companyId = hcmContext.employee?.companyId;
+    const role = hcmContext.employee?.role || hcmContext.profile?.role;
+    const canReadOperationalData =
+      hcmContext.identityResolved === true &&
+      typeof employeeId === 'string' && employeeId.trim().length > 0 &&
+      typeof companyId === 'string' && companyId.trim().length > 0;
 
     const runtimeContext = buildRuntimeContext({
       tenantId: request.context.tenantId,
-      companyId:
-        hcmContext.company?.companyId ||
-        hcmContext.employee?.companyId ||
-        request.context.companyId,
+      // Company authorization scope comes only from the trusted
+      // employee → company binding. request.context.companyId is never
+      // used as an authorization boundary; '' denies cleanly when
+      // identity is unresolved.
+      companyId: companyId ?? '',
       userId: request.context.userId,
       userEmail: hcmContext.employee?.email || request.context.userEmail,
       userName: hcmContext.employee?.displayName || request.context.userName,
-      role:
-        hcmContext.employee?.role ||
-        hcmContext.profile?.role ||
-        request.context.role,
+      // Role/profileId/permissions come only from persisted
+      // employee/profile authorization data — never from request.context.
+      role,
       profileId:
-        hcmContext.employee?.profileId ||
-        hcmContext.profile?.profileId ||
-        request.context.profileId,
-      permissions:
-        hcmContext.permissions.permissions.length > 0
-          ? hcmContext.permissions.permissions
-          : request.context.permissions || [],
+        hcmContext.employee?.profileId || hcmContext.profile?.profileId,
+      permissions: hcmContext.permissions.permissions,
       system: request.context.system,
       module: request.context.module,
       route: request.context.route,
@@ -125,36 +125,22 @@ export const askAuraIntelligence = async (
       operationalSystem ||
       resolveSearchSystem(resolvedContext.system, request.context.system);
 
-    const maintenanceContext =
-      searchSystem === 'aura_maintenance'
-        ? await buildAuraMaintenanceConnectorContext(resolvedContext.companyId)
-        : null;
+    // R3: company-wide summary authorization is undefined. Deny for every
+    // role, including management; canViewReports is not a summary grant.
+    // Keep operational lists available under their existing scope rules.
+    const maintenanceContext = null;
+    const maintenanceAnswer = null;
+    const signatureContext = null;
+    const signatureAnswer = null;
 
-    const maintenanceAnswer = maintenanceContext
-      ? answerAuraMaintenanceQuestion({
+    const operationalAnswer = canReadOperationalData
+      ? await answerAuraOperationalQuestion({
           question: request.question,
-          context: maintenanceContext,
+          companyId,
+          employeeId,
+          role,
         })
       : null;
-
-    const signatureContext =
-      searchSystem === 'aura_signature'
-        ? await buildAuraSignatureConnectorContext(resolvedContext.companyId)
-        : null;
-
-    const signatureAnswer = signatureContext
-      ? answerAuraSignatureQuestion({
-          question: request.question,
-          context: signatureContext,
-        })
-      : null;
-
-    const operationalAnswer = await answerAuraOperationalQuestion({
-      question: request.question,
-      companyId: resolvedContext.companyId,
-      employeeId: hcmContext.employee?.employeeId,
-      role: resolvedContext.role,
-    });
 
     const connectorAnswer = operationalAnswer || maintenanceAnswer || signatureAnswer;
 

@@ -130,21 +130,47 @@ import {
     ].includes(normalized);
   };
 
+  // SECURITY (GSTACK-AURA-AUTH-REMEDIATION-R2): resolves the scope a
+  // protected signature read may use. A non-management caller with a
+  // missing, empty, or whitespace-only employeeId is DENIED (null)
+  // before any Firestore query runs — missing employeeId must never be
+  // treated as "omit the employee filter".
+  type ReadScope =
+    | { isMgmt: true }
+    | { isMgmt: false; employeeId: string };
+
+  const resolveReadScope = (
+    role: string | undefined,
+    employeeId: string | undefined
+  ): ReadScope | null => {
+    if (isManagementRole(role)) {
+      return { isMgmt: true };
+    }
+
+    // Validate blankness only; equality must use the exact persisted key.
+    if (typeof employeeId !== 'string' || !employeeId.trim()) {
+      return null;
+    }
+
+    return { isMgmt: false, employeeId };
+  };
+
   export const getPendingSignaturesList = async (
     companyId: string,
     employeeId?: string,
     role?: string
   ): Promise<any[]> => {
     if (!db) return [];
+    const scope = resolveReadScope(role, employeeId);
+    if (!scope) return [];
     try {
-      const isMgmt = isManagementRole(role);
       const qConstraints = [
         where('status', 'in', ['pending', 'pending_signature', 'sent']),
         limit(6),
       ];
 
-      if (!isMgmt && employeeId) {
-        qConstraints.push(where('employeeId', '==', employeeId));
+      if (!scope.isMgmt) {
+        qConstraints.push(where('employeeId', '==', scope.employeeId));
       }
 
       const q = query(
@@ -168,15 +194,16 @@ import {
     role?: string
   ): Promise<any[]> => {
     if (!db) return [];
+    const scope = resolveReadScope(role, employeeId);
+    if (!scope) return [];
     try {
-      const isMgmt = isManagementRole(role);
       const qConstraints = [
         where('status', 'in', ['expired', 'rejected', 'declined']),
         limit(6),
       ];
 
-      if (!isMgmt && employeeId) {
-        qConstraints.push(where('employeeId', '==', employeeId));
+      if (!scope.isMgmt) {
+        qConstraints.push(where('employeeId', '==', scope.employeeId));
       }
 
       const q = query(
